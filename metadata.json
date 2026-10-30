@@ -1,0 +1,6 @@
+{
+  "name": "LifeCraft",
+  "description": "Your tasks, habits, goals, and ideas — all in one calm space. Build a life you love.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
