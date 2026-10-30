@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getNeonAuthCookieSecret } from '@/lib/auth/config';
 import { getResilientServerSession } from '@/lib/auth/server';
 import {
   createSignedGoogleOAuthState,
+  getGoogleOAuthSigningSecret,
   verifySignedGoogleOAuthStateSignatureOnly,
 } from '@/lib/calendar/google-calendar-crypto';
 import {
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
   if (launchState) {
     const verified = verifySignedGoogleOAuthStateSignatureOnly(
       launchState,
-      getNeonAuthCookieSecret()
+      getGoogleOAuthSigningSecret()
     );
     if (!verified.valid) {
       return NextResponse.json(
@@ -145,7 +145,7 @@ export async function GET(req: NextRequest) {
       redirectUri: config.redirectUri,
       returnTo: '/app/calendar',
     },
-    getNeonAuthCookieSecret()
+    getGoogleOAuthSigningSecret()
   );
 
   const authorizeUrl = buildGoogleCalendarAuthorizeUrl({

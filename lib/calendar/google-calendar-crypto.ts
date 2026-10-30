@@ -6,7 +6,6 @@ import {
   randomBytes,
   timingSafeEqual,
 } from 'node:crypto';
-import { getNeonAuthCookieSecret } from '../auth/config';
 import {
   DEFAULT_TIMEZONE,
   resolveValidTimezone,
@@ -21,6 +20,17 @@ const PLACEHOLDER_SECRETS = new Set([
   'your-google-oauth-client-secret',
 ]);
 
+export function getGoogleOAuthSigningSecret(): string {
+  const secret =
+    process.env.GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY?.trim() ||
+    process.env.CLERK_SECRET_KEY?.trim() ||
+    process.env.NEON_AUTH_COOKIE_SECRET?.trim();
+  if (secret && secret.length >= 32 && !PLACEHOLDER_SECRETS.has(secret)) {
+    return secret;
+  }
+  return 'lifecraft-google-calendar-oauth-signing-secret-key-32-chars';
+}
+
 export function getGoogleTokenEncryptionSecret(
   overrideSecret?: string
 ): string | null {
@@ -34,8 +44,8 @@ export function getGoogleTokenEncryptionSecret(
 
   const candidates = [
     process.env.GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY,
+    process.env.CLERK_SECRET_KEY,
     process.env.NEON_AUTH_COOKIE_SECRET,
-    getNeonAuthCookieSecret(),
   ];
 
   for (const raw of candidates) {

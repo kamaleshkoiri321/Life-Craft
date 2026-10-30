@@ -15,9 +15,8 @@ import {
 /**
  * LifeCraft Phase 3 — Application Database Schema (public schema)
  *
- * Authentication records live in the Neon-managed `neon_auth` schema and are never
- * modified by application migrations. Every application record is scoped to the
- * authenticated user's `user_id` and linked with cascading foreign keys.
+ * Authentication is managed by Clerk. Every application record is scoped to the
+ * authenticated Clerk `user_id` and linked with cascading foreign keys.
  */
 
 export const userProfiles = pgTable('user_profiles', {

@@ -154,7 +154,7 @@ export async function fetchDashboardDataForUser(
       sevenDaySlots[sevenDaySlots.length - 1]?.dateKey ?? '1970-01-01';
     const oldestSlotDateKey = shiftDateKeyByDays(todaySlotDateKey, -14);
 
-    const [userTasks, userHabits, userHabitLogs, userGoals, userNotes, authUserRowRes] =
+    const [userTasks, userHabits, userHabitLogs, userGoals, userNotes] =
       await Promise.all([
         db
           .select()
@@ -194,24 +194,9 @@ export async function fetchDashboardDataForUser(
           )
           .orderBy(desc(schema.notes.isPinned), desc(schema.notes.updatedAt))
           .limit(6),
-        db
-          .execute<{ name: string | null; image: string | null }>(sql`
-            SELECT name, image
-            FROM neon_auth."user"
-            WHERE id::text = ${authUser.id}
-            LIMIT 1
-          `)
-          .catch(() => null),
       ]);
 
-    const latestAuthRow = authUserRowRes?.rows?.[0];
-    const effectiveAuthUser = latestAuthRow
-      ? {
-          ...authUser,
-          name: latestAuthRow.name ?? authUser.name,
-          image: latestAuthRow.image ?? null,
-        }
-      : authUser;
+    const effectiveAuthUser = authUser;
 
     const payload = buildDashboardPayload({
       authUser: effectiveAuthUser,

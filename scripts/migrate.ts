@@ -13,7 +13,7 @@ import { getDatabaseUrl } from '../lib/db';
  *
  * Applies tracked SQL files from `./drizzle/*.sql` in alphabetical order
  * and records applied migrations in `public.__lifecraft_migrations`.
- * Never touches the `neon_auth` schema.
+ * Operates strictly on the application's public schema.
  */
 
 function splitSqlStatements(sqlContent: string): string[] {

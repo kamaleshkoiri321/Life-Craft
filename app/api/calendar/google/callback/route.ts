@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getNeonAuthCookieSecret } from '@/lib/auth/config';
 import { getResilientServerSession } from '@/lib/auth/server';
 import {
+  getGoogleOAuthSigningSecret,
   verifySignedGoogleOAuthState,
   verifySignedGoogleOAuthStateSignatureOnly,
 } from '@/lib/calendar/google-calendar-crypto';
@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
 
   const sigVerification = verifySignedGoogleOAuthStateSignatureOnly(
     state,
-    getNeonAuthCookieSecret()
+    getGoogleOAuthSigningSecret()
   );
 
   if (!sigVerification.valid) {
@@ -212,7 +212,7 @@ export async function POST(req: NextRequest) {
   }
 
   const nonceCookie = req.cookies.get(GOOGLE_OAUTH_STATE_COOKIE)?.value || '';
-  const signingSecret = getNeonAuthCookieSecret();
+  const signingSecret = getGoogleOAuthSigningSecret();
 
   const stateVerification = nonceCookie
     ? verifySignedGoogleOAuthState(state, user.id, nonceCookie, signingSecret)

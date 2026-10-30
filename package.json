@@ -19,7 +19,6 @@
     "@clerk/nextjs": "^7.9.21",
     "@google/genai": "^2.4.0",
     "@hookform/resolvers": "^5.2.1",
-    "@neondatabase/auth": "^0.7.0-beta",
     "@neondatabase/serverless": "^1.2.0",
     "autoprefixer": "^10.4.21",
     "class-variance-authority": "^0.7.1",

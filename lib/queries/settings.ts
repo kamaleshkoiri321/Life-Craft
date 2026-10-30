@@ -35,76 +35,6 @@ export type AccountDeleteResult =
   | { status: 'db_unconfigured'; message: string }
   | { status: 'db_error'; message: string };
 
-type NeonAuthUserRow = {
-  name: string | null;
-  email: string | null;
-  emailVerified: boolean | null;
-  image: string | null;
-  createdAt: string | Date | null;
-};
-
-type NeonAuthAccountRow = {
-  providerId: string;
-  hasPassword: boolean;
-};
-
-async function fetchNeonAuthAccountMeta(
-  userId: string
-): Promise<{
-  authRow: NeonAuthUserRow | null;
-  providers: string[];
-  hasPasswordAccount: boolean;
-}> {
-  const db = getDb();
-  try {
-    const [userRes, accountRes] = await Promise.all([
-      db.execute<NeonAuthUserRow>(sql`
-        SELECT
-          name,
-          email,
-          "emailVerified",
-          image,
-          "createdAt"
-        FROM neon_auth."user"
-        WHERE id::text = ${userId}
-        LIMIT 1
-      `),
-      db.execute<NeonAuthAccountRow>(sql`
-        SELECT
-          "providerId",
-          ("password" IS NOT NULL AND char_length("password") > 0) AS "hasPassword"
-        FROM neon_auth.account
-        WHERE "userId"::text = ${userId}
-      `),
-    ]);
-
-    const authRow = userRes.rows[0] ?? null;
-    const providerSet = new Set<string>();
-    let hasPasswordAccount = false;
-
-    for (const acc of accountRes.rows) {
-      if (acc.providerId) {
-        providerSet.add(acc.providerId);
-      }
-      if (acc.hasPassword || acc.providerId === 'credential') {
-        hasPasswordAccount = true;
-      }
-    }
-
-    return {
-      authRow,
-      providers: Array.from(providerSet),
-      hasPasswordAccount,
-    };
-  } catch {
-    return {
-      authRow: null,
-      providers: [],
-      hasPasswordAccount: false,
-    };
-  }
-}
-
 export async function getSettingsForUser(
   authUser: AuthenticatedUserIdentity
 ): Promise<SettingsQueryResult> {
@@ -116,15 +46,12 @@ export async function getSettingsForUser(
   }
 
   try {
-    const [{ profile, preferences }, authMeta] = await Promise.all([
-      ensureUserProfile(authUser),
-      fetchNeonAuthAccountMeta(authUser.id),
-    ]);
+    const { profile, preferences } = await ensureUserProfile(authUser);
 
     const displayName = resolveDisplayName(
       profile.displayName,
-      authMeta.authRow?.name ?? authUser.name,
-      authMeta.authRow?.email ?? authUser.email
+      authUser.name,
+      authUser.email
     );
 
     const rawTheme = preferences.theme;
@@ -138,23 +65,13 @@ export async function getSettingsForUser(
         ? preferences.weekStartsOn
         : 1;
 
-    const image =
-      authMeta.authRow !== null
-        ? authMeta.authRow.image ?? null
-        : (authUser.image ?? null);
+    const image = authUser.image ?? null;
+    const email = authUser.email;
+    const emailVerified = Boolean(authUser.emailVerified);
 
-    const email = authMeta.authRow?.email || authUser.email;
-    const emailVerified =
-      authMeta.authRow?.emailVerified !== undefined &&
-      authMeta.authRow?.emailVerified !== null
-        ? Boolean(authMeta.authRow.emailVerified)
-        : Boolean(authUser.emailVerified);
-
-    const createdAtIso = authMeta.authRow?.createdAt
-      ? new Date(authMeta.authRow.createdAt).toISOString()
-      : profile.createdAt
-        ? new Date(profile.createdAt).toISOString()
-        : null;
+    const createdAtIso = profile.createdAt
+      ? new Date(profile.createdAt).toISOString()
+      : null;
 
     return {
       status: 'ok',
@@ -172,8 +89,8 @@ export async function getSettingsForUser(
           weekStartsOn,
         },
         account: {
-          providers: authMeta.providers,
-          hasPasswordAccount: authMeta.hasPasswordAccount,
+          providers: [],
+          hasPasswordAccount: true,
           createdAt: createdAtIso,
         },
       },
@@ -257,34 +174,6 @@ export async function updateSettingsForUser(
         .where(eq(schema.userPreferences.userId, authUser.id));
     }
 
-    // Synchronize displayName / avatar image with neon_auth."user" for the authenticated user
-    if (displayName !== undefined && image !== undefined) {
-      await db.execute(sql`
-        UPDATE neon_auth."user"
-        SET
-          name = ${displayName},
-          image = ${image},
-          "updatedAt" = now()
-        WHERE id::text = ${authUser.id}
-      `);
-    } else if (displayName !== undefined) {
-      await db.execute(sql`
-        UPDATE neon_auth."user"
-        SET
-          name = ${displayName},
-          "updatedAt" = now()
-        WHERE id::text = ${authUser.id}
-      `);
-    } else if (image !== undefined) {
-      await db.execute(sql`
-        UPDATE neon_auth."user"
-        SET
-          image = ${image},
-          "updatedAt" = now()
-        WHERE id::text = ${authUser.id}
-      `);
-    }
-
     return await getSettingsForUser(authUser);
   } catch (err) {
     console.error('[LifeCraft Settings] Failed to update settings:', err);
@@ -351,22 +240,6 @@ export async function deleteAccountForUser(
     await db
       .delete(schema.userProfiles)
       .where(eq(schema.userProfiles.userId, authUser.id));
-
-    // 3. Delete user sessions, accounts, and user record from neon_auth schema
-    await db.execute(sql`
-      DELETE FROM neon_auth.session
-      WHERE "userId"::text = ${authUser.id}
-    `);
-
-    await db.execute(sql`
-      DELETE FROM neon_auth.account
-      WHERE "userId"::text = ${authUser.id}
-    `);
-
-    await db.execute(sql`
-      DELETE FROM neon_auth."user"
-      WHERE id::text = ${authUser.id}
-    `);
 
     return { status: 'ok' };
   } catch (err) {
