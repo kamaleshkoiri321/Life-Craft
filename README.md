@@ -1,9 +1,10 @@
 <div align="center">
 
-# LifeCraft 🌿
+# Life-Craft 🌿
 
 **Your tasks, habits, goals, notes, and reading library — all in one calm space. Build a life you love.**
 
+[![GitHub Repo](https://img.shields.io/badge/GitHub-kamaleshkoiri321%2FLife--Craft-181717?style=flat&logo=github)](https://github.com/kamaleshkoiri321/Life-Craft)
 [![Next.js](https://img.shields.io/badge/Next.js-15.5-black?style=flat&logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19.2-blue?style=flat&logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=flat&logo=typescript)](https://www.typescriptlang.org/)
@@ -12,9 +13,15 @@
 [![ORM](https://img.shields.io/badge/ORM-Drizzle_ORM-C5F74F?style=flat&logo=drizzle)](https://orm.drizzle.team/)
 [![Tailwind CSS](https://img.shields.io/badge/Styling-Tailwind_CSS_v4-38B2AC?style=flat&logo=tailwind-css)](https://tailwindcss.com/)
 [![Tests](https://img.shields.io/badge/Tests-62%20passed-brightgreen?style=flat&logo=node.js)](https://nodejs.org/api/test.html)
-[![Security](https://img.shields.io/badge/Security-Hardened-success?style=flat&logo=shield)](https://github.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-[Overview](#overview) • [Key Features](#key-features) • [Tech Stack](#tech-stack) • [Getting Started](#getting-started) • [Environment Configuration](#environment-configuration) • [Database Migrations](#database-migrations) • [Security Architecture](#security-architecture) • [Testing](#testing) • [Deployment](#deployment)
+<br />
+
+<img src="./public/images/hero-landing.jpg" alt="Life-Craft Application Preview" width="100%" style="border-radius: 14px; max-height: 480px; object-fit: cover; box-shadow: 0 10px 30px rgba(0,0,0,0.12);" />
+
+<br />
+
+[Overview](#overview) • [Key Features](#key-features) • [Tech Stack](#tech-stack) • [Getting Started](#getting-started) • [Environment Configuration](#environment-configuration) • [Security Architecture](#security-architecture) • [API & Webhooks](#api--webhooks) • [Testing](#testing) • [Deployment](#deployment) • [Author](#author)
 
 ---
 
@@ -22,28 +29,28 @@
 
 ## Overview
 
-**LifeCraft** is a modern, high-performance personal life management platform designed to replace fragmented tools. Instead of juggling separate apps for your to-do lists, habit trackers, long-term goals, personal journals, reading library, and focus timers, LifeCraft unifies them into a cohesive, distraction-free environment.
+**Life-Craft** is a high-performance, all-in-one personal productivity and life management platform designed to replace fragmented tools. Instead of juggling separate applications for your to-dos, habit trackers, milestone goals, personal journals, reading library, and focus studio, Life-Craft unifies them into a single, cohesive, distraction-free environment.
 
-Built with the Next.js 15 App Router and React 19, LifeCraft provides instantaneous 0ms section navigation, server-side data isolation, and end-to-end cryptographic security.
+Engineered with the **Next.js 15 App Router** and **React 19**, Life-Craft provides instantaneous 0ms section switching, server-side data isolation, and end-to-end cryptographic security.
 
 ---
 
 ## Key Features
 
 ### 📋 Task Management
-- **Priorities & Statuses:** Organize tasks by `low`, `medium`, `high`, or `urgent` priorities and track them across `pending`, `in_progress`, and `completed`.
-- **Hourly Scheduling:** Allocate specific time windows with calendar integration or mark items as flexible all-day tasks.
-- **Search & Filter:** Instant multi-parameter filtering by date, schedule, priority, and text query.
+- **Priorities & Statuses:** Categorize tasks by `low`, `medium`, `high`, or `urgent` priorities and track them across `pending`, `in_progress`, and `completed`.
+- **Hourly Scheduling:** Allocate specific time windows on the daily schedule or mark items as flexible all-day tasks.
+- **Search & Filter:** Instant multi-parameter filtering by date, schedule type, priority, and text search.
 
 ### 🔄 Habit Tracking & Routines
-- **Weekday Targeting:** Custom schedules (e.g., Monday/Wednesday/Friday or daily commitments).
-- **Streak Calculation:** Resilient streak algorithms that account for non-scheduled days without breaking your progress momentum.
+- **Weekday Targeting:** Flexible schedules (e.g., specific weekdays like Mon/Wed/Fri or daily commitments).
+- **Streak Calculation:** Resilient streak algorithms that account for unscheduled rest days without breaking your streak.
 - **12-Week Heatmap:** Visual historical check-in density inspired by GitHub-style contribution graphs.
 
 ### 🎯 Goals & Milestones
-- **Multi-Level Tracking:** Break expansive life visions into bite-sized, sequential milestones.
-- **Automatic Progress Calculation:** Goal completion percentages compute dynamically from milestone achievements.
-- **Status Lifecycle:** Transition seamlessly between `not_started`, `in_progress`, `completed`, and `archived`.
+- **Multi-Level Tracking:** Break expansive life visions into structured, sequential milestones.
+- **Dynamic Progress:** Goal completion percentages compute dynamically from milestone achievements.
+- **Lifecycle Management:** Transition goals seamlessly between `not_started`, `in_progress`, `completed`, and `archived`.
 
 ### 📝 Notes & Personal Journaling
 - **Safe Markdown Rendering:** Custom AST-based markdown parser rendering headers, checklists, quotes, and syntax blocks without dangerous `innerHTML` injection.
@@ -82,7 +89,7 @@ Built with the Next.js 15 App Router and React 19, LifeCraft provides instantane
 | **Database** | [Neon Serverless PostgreSQL](https://neon.tech/) | Cloud-native serverless PostgreSQL with connection pooling |
 | **ORM & Migrations** | [Drizzle ORM](https://orm.drizzle.team/) & Drizzle Kit | Type-safe SQL queries, schema definitions, and migration runner |
 | **Storage** | S3-Compatible Storage / Private Vault | Scalable document storage for uploaded library materials |
-| **Testing** | Node.js Test Runner (`node --test`) & `tsx` | Fast, zero-dependency unit and security test suite |
+| **Testing** | Node.js Test Runner (`node --test`) & `tsx` | Fast, zero-dependency unit, timezone, and security test suite |
 
 ---
 
@@ -97,8 +104,8 @@ Built with the Next.js 15 App Router and React 19, LifeCraft provides instantane
 ### 1. Clone & Install Dependencies
 
 ```bash
-git clone https://github.com/your-username/lifecraft.git
-cd lifecraft
+git clone https://github.com/kamaleshkoiri321/Life-Craft.git
+cd Life-Craft
 npm install
 ```
 
@@ -176,7 +183,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Security Architecture
 
-LifeCraft adheres to a zero-trust, defense-in-depth security model:
+Life-Craft adheres to a zero-trust, defense-in-depth security model:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -229,9 +236,31 @@ LifeCraft adheres to a zero-trust, defense-in-depth security model:
 
 ---
 
+## API & Webhooks
+
+### Key Endpoints
+
+| Method | Endpoint | Description | Auth Required | CSRF / Rate Limit |
+| :--- | :--- | :--- | :---: | :---: |
+| `GET` | `/api/dashboard` | Aggregated overview data | Yes | Read-only |
+| `POST` | `/api/tasks` | Create a new task | Yes | Yes (120 req/min) |
+| `PATCH` | `/api/tasks/[id]` | Update task status, priority, or schedule | Yes | Yes (120 req/min) |
+| `DELETE` | `/api/tasks/[id]` | Delete a task | Yes | Yes (120 req/min) |
+| `POST` | `/api/habits` | Create a habit routine | Yes | Yes (120 req/min) |
+| `POST` | `/api/habits/[id]/check-in` | Log daily habit completion | Yes | Yes (120 req/min) |
+| `POST` | `/api/goals` | Create a life goal | Yes | Yes (120 req/min) |
+| `POST` | `/api/goals/[id]/milestones` | Add goal milestone | Yes | Yes (120 req/min) |
+| `POST` | `/api/notes` | Create a note or journal entry | Yes | Yes (120 req/min) |
+| `POST` | `/api/library/upload/init` | Initiate secure document upload | Yes | Yes (60 req/min) |
+| `PUT` | `/api/library/upload/[id]` | Upload binary PDF/EPUB bytes | Yes | Yes (60 req/min) |
+| `POST` | `/api/calendar/google/export` | Export task to Google Calendar | Yes | Yes (60 req/min) |
+| `POST` | `/api/webhooks/clerk` | Svix-verified user lifecycle sync | No (Svix HMAC) | Svix Signature |
+
+---
+
 ## Testing
 
-LifeCraft features a comprehensive automated test suite testing validation, timezones, security guards, crypto, and models:
+Life-Craft features an automated test suite verifying validation, timezones, security guards, crypto, and data models:
 
 ```bash
 npm run test
@@ -275,6 +304,14 @@ Total: 62 passed, 0 failed (100% pass rate)
    npm run build
    npm run start
    ```
+
+---
+
+## Author
+
+**Kamalesh Koiri**  
+GitHub: [@kamaleshkoiri321](https://github.com/kamaleshkoiri321)  
+Repository: [kamaleshkoiri321/Life-Craft](https://github.com/kamaleshkoiri321/Life-Craft)
 
 ---
 
