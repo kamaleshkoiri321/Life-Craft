@@ -73,18 +73,12 @@ const COLOR_PALETTE = [
 ];
 
 const REMINDER_PRESETS: { minutes: number; label: string }[] = [
-  { minutes: 0, label: 'At time of event' },
-  { minutes: 5, label: '5 minutes before' },
-  { minutes: 8, label: '8 minutes before' },
-  { minutes: 10, label: '10 minutes before' },
-  { minutes: 15, label: '15 minutes before' },
-  { minutes: 20, label: '20 minutes before' },
-  { minutes: 30, label: '30 minutes before' },
-  { minutes: 45, label: '45 minutes before' },
-  { minutes: 60, label: '1 hour before' },
-  { minutes: 120, label: '2 hours before' },
-  { minutes: 1440, label: '1 day before' },
-  { minutes: 10080, label: '1 week before' },
+  { minutes: 5, label: '5 min' },
+  { minutes: 10, label: '10 min' },
+  { minutes: 15, label: '15 min' },
+  { minutes: 30, label: '30 min' },
+  { minutes: 60, label: '1 hour' },
+  { minutes: 1440, label: '1 day' },
 ];
 
 const DURATION_PRESETS = [

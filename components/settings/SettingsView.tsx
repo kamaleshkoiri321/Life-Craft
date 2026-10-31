@@ -64,16 +64,11 @@ interface SettingsViewProps {
 const REMINDER_PRESET_OPTIONS = [
   { value: 0, label: 'At event start time' },
   { value: 5, label: '5 minutes before' },
-  { value: 8, label: '8 minutes before' },
   { value: 10, label: '10 minutes before' },
   { value: 15, label: '15 minutes before' },
-  { value: 20, label: '20 minutes before' },
   { value: 30, label: '30 minutes before' },
-  { value: 45, label: '45 minutes before' },
   { value: 60, label: '1 hour before' },
-  { value: 120, label: '2 hours before' },
   { value: 1440, label: '1 day before' },
-  { value: 10080, label: '1 week before' },
 ];
 
 export default function SettingsView({
