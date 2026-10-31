@@ -184,11 +184,11 @@ export default function NotesView({
     sortBy,
   ]);
 
-  // Resolve effective selected note (either explicit selection or first visible note on desktop)
+  // Resolve effective selected note (either explicit selection within current filtered list, or first visible note on desktop)
   const effectiveSelectedNote = useMemo(() => {
-    if (!workspace) return null;
+    if (!workspace || filteredNotes.length === 0) return null;
     if (selectedNoteId) {
-      const found = workspace.notes.find((n) => n.id === selectedNoteId);
+      const found = filteredNotes.find((n) => n.id === selectedNoteId);
       if (found) return found;
     }
     return filteredNotes[0] ?? null;
@@ -1036,6 +1036,9 @@ export default function NotesView({
         existingTags={tags}
         onClose={() => setIsCreateNoteOpen(false)}
         onCreated={(nextWs, createdNote) => {
+          if (activeTab === 'archived' || activeTab === 'trash') {
+            setActiveTab(createdNote.entryType === 'journal' ? 'journal' : 'all');
+          }
           handleWorkspaceUpdated(nextWs, createdNote);
           setIsMobileDetailOpen(true);
           setIsEditingNote(false);

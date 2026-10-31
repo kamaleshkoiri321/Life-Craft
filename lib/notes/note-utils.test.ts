@@ -159,6 +159,31 @@ test('parseSafeMarkdownBlocks parses headings, lists, checklists, blockquotes wi
   assert.ok(buildNoteExcerpt(md, 60).length <= 63);
 });
 
+test('parseSafeMarkdownBlocks safely handles edge cases without infinite loops or hanging', () => {
+  const edgeCases = [
+    '# ', // Single hash with space (user note freeze scenario)
+    '## ',
+    '### ',
+    '#### Level 4 Heading',
+    '##### Level 5 Heading',
+    '###### Level 6 Heading',
+    '#tag #productivity',
+    '---',
+    '***',
+    '___',
+    '```ts\nconst unclosed = true;',
+    '> only a quote line',
+    '- not a checklist [ ]',
+    '1. ordered without following items',
+    '**\n\n\n**Hi there\n\n\n# ',
+  ];
+
+  for (const item of edgeCases) {
+    const parsed = parseSafeMarkdownBlocks(item);
+    assert.ok(Array.isArray(parsed));
+  }
+});
+
 test('buildNotesViewModel, filterAndSortNotes, and computeRelatedNotes calculate genuine metrics without predefined categories', () => {
   const now = new Date('2026-10-29T12:00:00Z');
   const emptyVm = buildNotesViewModel({

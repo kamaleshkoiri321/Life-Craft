@@ -265,6 +265,9 @@ export function tokenizeInlineMarkdown(text: string): InlineMarkdownToken[] {
     }
 
     lastIndex = pattern.lastIndex;
+    if (match.index === pattern.lastIndex) {
+      pattern.lastIndex++;
+    }
   }
 
   if (lastIndex < text.length) {
@@ -297,6 +300,7 @@ export function parseSafeMarkdownBlocks(content: string): SafeMarkdownBlock[] {
 
   let i = 0;
   while (i < rawLines.length) {
+    const startIndex = i;
     const line = rawLines[i];
     const trimmed = line.trim();
 
@@ -330,8 +334,8 @@ export function parseSafeMarkdownBlocks(content: string): SafeMarkdownBlock[] {
       continue;
     }
 
-    // Heading
-    const headingMatch = trimmed.match(/^(#{1,3})\s+(.+)$/);
+    // Heading (support 1-6 hashes, clamping to 1, 2, or 3)
+    const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
     if (headingMatch) {
       const level = Math.min(3, Math.max(1, headingMatch[1].length)) as
         | 1
@@ -364,7 +368,11 @@ export function parseSafeMarkdownBlocks(content: string): SafeMarkdownBlock[] {
         });
         i += 1;
       }
-      blocks.push({ type: 'checklist', items });
+      if (items.length > 0) {
+        blocks.push({ type: 'checklist', items });
+      } else {
+        i += 1;
+      }
       continue;
     }
 
@@ -382,7 +390,11 @@ export function parseSafeMarkdownBlocks(content: string): SafeMarkdownBlock[] {
         items.push(currentTrimmed.replace(/^[-*+]\s+/, ''));
         i += 1;
       }
-      blocks.push({ type: 'bullet_list', items });
+      if (items.length > 0) {
+        blocks.push({ type: 'bullet_list', items });
+      } else {
+        i += 1;
+      }
       continue;
     }
 
@@ -396,7 +408,11 @@ export function parseSafeMarkdownBlocks(content: string): SafeMarkdownBlock[] {
         items.push(orderedMatch[1]);
         i += 1;
       }
-      blocks.push({ type: 'ordered_list', items });
+      if (items.length > 0) {
+        blocks.push({ type: 'ordered_list', items });
+      } else {
+        i += 1;
+      }
       continue;
     }
 
@@ -423,20 +439,23 @@ export function parseSafeMarkdownBlocks(content: string): SafeMarkdownBlock[] {
       continue;
     }
 
-    // Paragraph
+    // Paragraph (any other text, including #hashtag, #### without space, or any regular lines)
     const paraLines: string[] = [];
     while (i < rawLines.length) {
       const cur = rawLines[i].trim();
-      if (
-        !cur ||
-        cur.startsWith('```') ||
-        cur.startsWith('#') ||
-        cur.startsWith('>') ||
-        /^[-*+]\s+/.test(cur) ||
-        /^\d+\.\s+/.test(cur) ||
-        /^(-{3,}|\*{3,}|_{3,})$/.test(cur)
-      ) {
-        break;
+      // On subsequent lines of a paragraph, stop if we hit an empty line or the start of a recognized new block
+      if (paraLines.length > 0) {
+        if (
+          !cur ||
+          cur.startsWith('```') ||
+          cur.startsWith('>') ||
+          /^(#{1,6})\s+(.+)$/.test(cur) ||
+          /^[-*+]\s+/.test(cur) ||
+          /^\d+\.\s+/.test(cur) ||
+          /^(-{3,}|\*{3,}|_{3,})$/.test(cur)
+        ) {
+          break;
+        }
       }
       paraLines.push(cur);
       i += 1;
@@ -446,6 +465,11 @@ export function parseSafeMarkdownBlocks(content: string): SafeMarkdownBlock[] {
         type: 'paragraph',
         text: paraLines.join(' '),
       });
+    }
+
+    // Universal safety check: guarantee the outer loop always advances
+    if (i <= startIndex) {
+      i = startIndex + 1;
     }
   }
 
