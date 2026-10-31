@@ -49,6 +49,46 @@ export const EVENT_COLORS = [
 
 export const DEFAULT_EVENT_COLOR = '#5938B5';
 
+/**
+ * Normalizes any time representation (e.g. "5:45 AM", "05:45", "9:00", "4:32 PM")
+ * into a strict HTML5-compliant 24-hour "HH:mm" string (e.g. "05:45", "16:32").
+ */
+export function normalizeTo24HourTime(
+  timeStr: string | null | undefined,
+  defaultTime = '09:00'
+): string {
+  if (!timeStr || typeof timeStr !== 'string') return defaultTime;
+  const trimmed = timeStr.trim();
+  if (!trimmed) return defaultTime;
+
+  // Check if it's already HH:mm (24-hour with leading zero)
+  if (/^([01]\d|2[0-3]):[0-5]\d$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  // Check if it's H:mm (e.g. "9:00" -> "09:00")
+  if (/^\d:[0-5]\d$/.test(trimmed)) {
+    return `0${trimmed}`;
+  }
+
+  // Check if it has 12-hour AM/PM (e.g. "5:45 AM", "05:45 AM", "4:32 PM", "12:15 PM")
+  const ampmMatch = /^(\d{1,2}):([0-5]\d)(?::[0-5]\d)?\s*([ap]m)$/i.exec(trimmed);
+  if (ampmMatch) {
+    let hour = parseInt(ampmMatch[1], 10);
+    const minute = ampmMatch[2];
+    const meridian = ampmMatch[3].toUpperCase();
+
+    if (meridian === 'PM' && hour < 12) {
+      hour += 12;
+    } else if (meridian === 'AM' && hour === 12) {
+      hour = 0;
+    }
+    return `${String(hour).padStart(2, '0')}:${minute}`;
+  }
+
+  return defaultTime;
+}
+
 export const REMINDER_PRESETS = [
   { value: 0, label: 'At start time' },
   { value: 5, label: '5 minutes before' },
@@ -233,8 +273,16 @@ export function serializeCalendarEventRow(
   const startDate = startExtract.localDate ?? getLocalDateString(startAt, tz);
   const endDate = endExtract.localDate ?? getLocalDateString(endAt, tz);
 
-  const startTime = row.isAllDay ? null : startExtract.localTime;
-  const endTime = row.isAllDay ? null : endExtract.localTime;
+  const startTime = row.isAllDay
+    ? null
+    : startExtract.localTime
+      ? normalizeTo24HourTime(startExtract.localTime)
+      : '09:00';
+  const endTime = row.isAllDay
+    ? null
+    : endExtract.localTime
+      ? normalizeTo24HourTime(endExtract.localTime)
+      : '10:00';
 
   const startMs = startAt.getTime();
   const endMs = endAt.getTime();
@@ -392,8 +440,14 @@ export function validateCalendarEventInput(
     errors.endDate = 'End date must be formatted as YYYY-MM-DD.';
   }
 
-  let startTimeStr = typeof raw.startTime === 'string' ? raw.startTime.trim() : null;
-  let endTimeStr = typeof raw.endTime === 'string' ? raw.endTime.trim() : null;
+  let startTimeStr =
+    typeof raw.startTime === 'string'
+      ? normalizeTo24HourTime(raw.startTime, '')
+      : null;
+  let endTimeStr =
+    typeof raw.endTime === 'string'
+      ? normalizeTo24HourTime(raw.endTime, '')
+      : null;
 
   if (!isAllDay) {
     if (!startTimeStr || !/^([01]\d|2[0-3]):([0-5]\d)$/.test(startTimeStr)) {

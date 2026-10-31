@@ -4,6 +4,7 @@ import {
   detectMeetingPlatform,
   formatReminderLabel,
   formatRecurrenceLabel,
+  normalizeTo24HourTime,
   validateCalendarEventInput,
   expandRecurringInstances,
   serializeCalendarEventRow,
@@ -15,6 +16,17 @@ import {
   buildCalendarDayDescriptor,
   CALENDAR_VIEWS,
 } from './calendar-utils';
+
+test('normalizeTo24HourTime converts 12-hour AM/PM and non-standard time strings into valid HTML5 HH:mm', () => {
+  assert.equal(normalizeTo24HourTime('5:45 AM'), '05:45');
+  assert.equal(normalizeTo24HourTime('6:45 AM'), '06:45');
+  assert.equal(normalizeTo24HourTime('12:00 AM'), '00:00');
+  assert.equal(normalizeTo24HourTime('12:30 PM'), '12:30');
+  assert.equal(normalizeTo24HourTime('4:32 PM'), '16:32');
+  assert.equal(normalizeTo24HourTime('10:30'), '10:30');
+  assert.equal(normalizeTo24HourTime('9:00'), '09:00');
+  assert.equal(normalizeTo24HourTime(null), '09:00');
+});
 
 test('detectMeetingPlatform identifies Google Meet, Zoom, Teams, Webex, and custom links', () => {
   // Google Meet

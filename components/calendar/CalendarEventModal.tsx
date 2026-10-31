@@ -29,6 +29,7 @@ import {
 import {
   detectMeetingPlatform,
   formatReminderLabel,
+  normalizeTo24HourTime,
   type CalendarEventInput,
   type CalendarEventReminder,
   type CalendarEventRecurrenceRule,
@@ -180,9 +181,9 @@ export default function CalendarEventModal({
       setColor(initialEvent.color || '#5938B5');
       setIsAllDay(Boolean(initialEvent.isAllDay));
       setStartDate(initialEvent.startDate);
-      setStartTime(initialEvent.startTime || '09:00');
+      setStartTime(normalizeTo24HourTime(initialEvent.startTime, '09:00'));
       setEndDate(initialEvent.endDate || initialEvent.startDate);
-      setEndTime(initialEvent.endTime || '10:00');
+      setEndTime(normalizeTo24HourTime(initialEvent.endTime, '10:00'));
       setDescription(initialEvent.description || '');
       setNotes(initialEvent.notes || '');
       setMeetingUrl(initialEvent.meetingUrl || '');
@@ -220,7 +221,7 @@ export default function CalendarEventModal({
       setStartDate(today);
       setEndDate(today);
 
-      const initialStart = defaultStartTime || '09:00';
+      const initialStart = normalizeTo24HourTime(defaultStartTime, '09:00');
       setStartTime(initialStart);
       const [h, m] = initialStart.split(':').map(Number);
       const endH = (h + 1) % 24;
