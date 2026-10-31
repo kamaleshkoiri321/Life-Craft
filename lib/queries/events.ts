@@ -6,7 +6,7 @@ import {
   type CalendarEventAttachmentRow,
   type CalendarEventRow,
 } from '../db/schema';
-import type { AuthSessionUser } from './dashboard';
+import { ensureUserProfile, type AuthSessionUser } from './dashboard';
 import {
   expandRecurringInstances,
   serializeCalendarEventRow,
@@ -52,6 +52,7 @@ export async function listCalendarEventsForUser(
 
   try {
     const db = getDb();
+    await ensureUserProfile(authUser);
     const tz = resolveValidTimezone(filters.timezone);
 
     const conditions = [eq(calendarEvents.userId, authUser.id)];
@@ -168,6 +169,7 @@ export async function getCalendarEventById(
 
   try {
     const db = getDb();
+    await ensureUserProfile(authUser);
     const [row] = await db
       .select()
       .from(calendarEvents)
@@ -229,6 +231,7 @@ export async function createCalendarEvent(
 
   try {
     const db = getDb();
+    await ensureUserProfile(authUser);
     const data = validation.cleaned;
 
     const [inserted] = await db
@@ -292,6 +295,7 @@ export async function updateCalendarEvent(
 
   try {
     const db = getDb();
+    await ensureUserProfile(authUser);
     const data = validation.cleaned;
 
     const [updated] = await db
@@ -364,6 +368,7 @@ export async function deleteCalendarEvent(
 
   try {
     const db = getDb();
+    await ensureUserProfile(authUser);
 
     // Fetch attachments to delete their storage files
     const attachments = await db
@@ -435,6 +440,7 @@ export async function addEventAttachment(
 
   try {
     const db = getDb();
+    await ensureUserProfile(authUser);
     // Verify event ownership
     const [eventRow] = await db
       .select({ id: calendarEvents.id })
