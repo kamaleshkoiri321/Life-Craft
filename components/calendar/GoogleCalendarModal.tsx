@@ -4,11 +4,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   AlertCircle,
   Calendar,
-  Check,
   CheckCircle2,
-  Copy,
   ExternalLink,
-  KeyRound,
   Link2Off,
   Loader2,
   ShieldCheck,
@@ -48,7 +45,6 @@ export default function GoogleCalendarModal({
   onDisconnected,
   onConnected,
 }: GoogleCalendarModalProps) {
-  const [copiedRedirect, setCopiedRedirect] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -160,30 +156,6 @@ export default function GoogleCalendarModal({
   }, [isOpen, handleBridgePayload]);
 
   if (!isOpen) return null;
-
-  const effectiveRedirectUri = (() => {
-    if (
-      config.redirectUri &&
-      config.redirectUri.includes('/api/calendar/google/callback')
-    ) {
-      return config.redirectUri;
-    }
-    const origin =
-      typeof window !== 'undefined' && window.location.origin
-        ? window.location.origin.replace(/\/+$/, '')
-        : 'https://lifecraft-hero.vercel.app';
-    return `${origin}/api/calendar/google/callback`;
-  })();
-
-  const handleCopyRedirectUri = async () => {
-    try {
-      await navigator.clipboard.writeText(effectiveRedirectUri);
-      setCopiedRedirect(true);
-      setTimeout(() => setCopiedRedirect(false), 2000);
-    } catch {
-      // Ignore clipboard failures in restricted contexts
-    }
-  };
 
   // Full-page OAuth redirect flow
   const handleConnectClick = async () => {
@@ -369,81 +341,15 @@ export default function GoogleCalendarModal({
           )}
         </div>
 
-        {/* Exact OAuth Redirect URI Reference (Always visible so user can verify Google Cloud Console) */}
-        <div className="rounded-xl border border-[#171622]/12 bg-white p-4 space-y-2.5">
-          <p className="text-xs font-semibold text-[#171622]">
-            Authorized Redirect URI for Google Cloud Console:
-          </p>
-          <div className="flex items-center justify-between gap-2 rounded-lg border border-[#171622]/12 bg-[#FAF9F6] px-3 py-2">
-            <code className="text-[11px] font-mono text-[#171622] break-all">
-              {effectiveRedirectUri}
-            </code>
-            <button
-              type="button"
-              onClick={handleCopyRedirectUri}
-              aria-label="Copy Google Calendar OAuth redirect URI"
-              className="inline-flex items-center gap-1 rounded-md border border-[#171622]/12 bg-white px-2.5 py-1 text-[11px] font-semibold text-[#171622] hover:bg-[#171622]/5 shrink-0"
-            >
-              {copiedRedirect ? (
-                <>
-                  <Check className="h-3 w-3 text-[#2F6B1E]" />
-                  <span>Copied</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3 w-3" />
-                  <span>Copy</span>
-                </>
-              )}
-            </button>
-          </div>
-          <p className="text-[11px] text-[#171622]/65 leading-relaxed">
-            Ensure this exact callback URL is listed under{' '}
-            <strong className="font-semibold text-[#171622]">
-              Authorized redirect URIs
-            </strong>{' '}
-            in your Google Cloud Console Web OAuth 2.0 Client, and that the{' '}
-            <strong className="font-semibold text-[#171622]">
-              Google Calendar API
-            </strong>{' '}
-            is enabled.
-          </p>
-        </div>
-
-        {/* Configuration & Setup Guide when server secrets are missing */}
+        {/* Status card: if configured, show privacy guarantee. If unconfigured, show a graceful notice */}
         {!config.isConfigured ? (
-          <div className="rounded-xl border border-[#171622]/12 bg-white p-4 space-y-3.5">
-            <div className="flex items-start gap-2.5">
-              <KeyRound
-                className="mt-0.5 h-4 w-4 shrink-0 text-[#5938B5]"
-                aria-hidden="true"
-              />
-              <div className="space-y-1">
-                <h3 className="text-xs sm:text-sm font-bold text-[#171622]">
-                  Server OAuth Configuration Required for Google Calendar
-                </h3>
-                <p className="text-xs text-[#171622]/70 leading-relaxed">
-                  Your internal LifeCraft calendar is fully active. To enable
-                  live Google Calendar OAuth synchronization and encrypted
-                  per-user token storage, add these server secrets in Google AI
-                  Studio Secrets:
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              {config.missingEnvVars.map((envVar) => (
-                <div
-                  key={envVar}
-                  className="flex items-center justify-between rounded-lg bg-[#FAF9F6] px-3 py-1.5 text-xs font-mono text-[#171622]"
-                >
-                  <span>{envVar}</span>
-                  <span className="text-[11px] font-sans font-semibold text-[#B42318]">
-                    Missing
-                  </span>
-                </div>
-              ))}
-            </div>
+          <div className="rounded-xl border border-[#171622]/10 bg-[#FAF9F6] p-4 text-center space-y-1.5">
+            <p className="text-xs sm:text-sm font-semibold text-[#171622]">
+              Google Calendar Sync Unavailable
+            </p>
+            <p className="text-xs text-[#171622]/65 leading-relaxed">
+              Google Calendar synchronization is currently not enabled for this workspace. Your local LifeCraft calendar remains fully functional.
+            </p>
           </div>
         ) : (
           <div className="rounded-xl border border-[#171622]/10 bg-[#FAF9F6]/60 p-4 space-y-2">
