@@ -55,22 +55,13 @@ export default function HeroSection() {
             <div className="relative w-full overflow-hidden rounded-3xl border border-[#171622]/12 bg-[#FAF9F6] shadow-md hover:shadow-xl transition-shadow duration-300">
               <Image
                 src="/images/hero-landing.jpg"
-                alt="A tranquil, sun-dappled terrace surrounded by blooming greenery at dawn, symbolizing an intentional, organized life"
+                alt="A tranquil, sun-dappled terrace surrounded by blooming greenery at dawn with the message 'You only have one life. Make it count.', symbolizing an intentional, organized life"
                 width={1400}
                 height={875}
                 priority
                 sizes="(max-width: 1280px) 100vw, 58vw"
                 className="w-full h-auto object-cover max-h-[520px] transition-transform duration-300 hover:scale-[1.01]"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
-              <div className="absolute bottom-6 left-6 right-6 text-white pointer-events-none">
-                <p className="text-xs sm:text-sm uppercase tracking-widest font-semibold text-white/80">
-                  You only have
-                </p>
-                <h2 className="font-display text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-[#FAF9F6]">
-                  ONE LIFE. <span className="text-[#F5E68C]">MAKE IT COUNT.</span>
-                </h2>
-              </div>
             </div>
           </div>
         </div>
