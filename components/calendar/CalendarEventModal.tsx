@@ -111,6 +111,15 @@ export default function CalendarEventModal({
 }: CalendarEventModalProps) {
   const modalId = useId();
 
+  // Detect and respect device timezone
+  const effectiveTimezone = useMemo(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || timezone || 'Asia/Kathmandu';
+    } catch {
+      return timezone || 'Asia/Kathmandu';
+    }
+  }, [timezone]);
+
   // Basic info
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('Meeting');
@@ -492,7 +501,7 @@ export default function CalendarEventModal({
       endDate: endDate || startDate,
       endTime: isAllDay ? undefined : endTime,
       isAllDay,
-      timezone,
+      timezone: effectiveTimezone,
       meetingUrl: meetingUrl.trim() || undefined,
       recurrenceRule: recurrenceRule || undefined,
       reminders,
@@ -674,6 +683,9 @@ export default function CalendarEventModal({
               <span className="text-xs font-bold text-[#171622] flex items-center gap-1.5">
                 <Clock className="h-4 w-4 text-[#5938B5]" />
                 Date & Time
+                <span className="text-[10px] text-[#5938B5] font-semibold bg-[#5938B5]/10 px-2 py-0.5 rounded-full ml-1">
+                  Device: {effectiveTimezone}
+                </span>
               </span>
               <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-[#171622]/80">
                 <input

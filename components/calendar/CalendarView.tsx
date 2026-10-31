@@ -77,6 +77,26 @@ export default function CalendarView({
   timezone,
   onTasksMutated,
 }: CalendarViewProps) {
+  // Automatically detect client device's timezone
+  const [deviceTimezone, setDeviceTimezone] = useState<string>(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || timezone || 'Asia/Kathmandu';
+    } catch {
+      return timezone || 'Asia/Kathmandu';
+    }
+  });
+
+  useEffect(() => {
+    try {
+      const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (detected && detected !== deviceTimezone) {
+        setDeviceTimezone(detected);
+      }
+    } catch {
+      // Fallback
+    }
+  }, [deviceTimezone]);
+
   const [viewMode, setViewMode] = useState<CalendarViewMode>('week');
   const [anchorDate, setAnchorDate] = useState<string>(todayLocalDate);
   const [selectedDate, setSelectedDate] = useState<string>(todayLocalDate);
@@ -118,14 +138,28 @@ export default function CalendarView({
       setIsLoading(true);
       setErrorMessage(null);
       try {
+        const currentTz =
+          deviceTimezone ||
+          (() => {
+            try {
+              return Intl.DateTimeFormat().resolvedOptions().timeZone;
+            } catch {
+              return timezone;
+            }
+          })();
+
         const params = new URLSearchParams({
           view: mode,
           anchorDate: date,
+          timezone: currentTz,
         });
         const response = await fetch(`/api/calendar?${params.toString()}`, {
           method: 'GET',
           credentials: 'include',
           cache: 'no-store',
+          headers: {
+            'x-device-timezone': currentTz,
+          },
         });
         const result = (await response.json().catch(() => null)) as CalendarQueryResult | null;
 
@@ -143,19 +177,33 @@ export default function CalendarView({
         setIsLoading(false);
       }
     },
-    []
+    [deviceTimezone, timezone]
   );
 
   useEffect(() => {
     let cancelled = false;
+    const currentTz =
+      deviceTimezone ||
+      (() => {
+        try {
+          return Intl.DateTimeFormat().resolvedOptions().timeZone;
+        } catch {
+          return timezone;
+        }
+      })();
+
     const params = new URLSearchParams({
       view: viewMode,
       anchorDate,
+      timezone: currentTz,
     });
     fetch(`/api/calendar?${params.toString()}`, {
       method: 'GET',
       credentials: 'include',
       cache: 'no-store',
+      headers: {
+        'x-device-timezone': currentTz,
+      },
     })
       .then(async (response) => {
         if (cancelled) return;
@@ -204,7 +252,7 @@ export default function CalendarView({
     }
   }, [viewMode, scrollToSixAm]);
 
-  const activeTimezone = calendarData?.timezone || timezone;
+  const activeTimezone = deviceTimezone || calendarData?.timezone || timezone;
   const weekStartsOn = calendarData?.weekStartsOn ?? 1;
 
   const period = useMemo(
@@ -659,7 +707,7 @@ export default function CalendarView({
             </h1>
             <span className="inline-flex items-center gap-1.5 rounded-xl border border-[#171622]/10 bg-white px-2.5 py-1 text-xs font-medium text-[#171622]/70">
               <Clock className="h-3.5 w-3.5 text-[#5938B5]" />
-              <span>{activeTimezone}</span>
+              <span>Device Time ({activeTimezone})</span>
             </span>
           </div>
           <p className="text-xs sm:text-sm text-[#171622]/65">

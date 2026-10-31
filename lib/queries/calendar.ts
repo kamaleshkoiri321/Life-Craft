@@ -3,6 +3,7 @@ import { getDb, isDatabaseConfigured } from '../db';
 import {
   tasks,
   userPreferences,
+  userProfiles,
 } from '../db/schema';
 import { ensureUserProfile, type AuthSessionUser } from './dashboard';
 import {
@@ -53,6 +54,7 @@ export async function getCalendarViewDataForUser(
   options?: {
     anchorDate?: string;
     view?: string;
+    timezone?: string;
   }
 ): Promise<CalendarQueryResult> {
   if (!isDatabaseConfigured()) {
@@ -67,8 +69,17 @@ export async function getCalendarViewDataForUser(
     const db = getDb();
     const { profile } = await ensureUserProfile(authUser);
     const timezone = resolveValidTimezone(
-      profile?.timezone ?? DEFAULT_TIMEZONE
+      options?.timezone || profile?.timezone || DEFAULT_TIMEZONE
     );
+
+    // Keep profile timezone updated to current device timezone
+    if (options?.timezone && profile?.timezone !== timezone) {
+      await db
+        .update(userProfiles)
+        .set({ timezone, updatedAt: new Date() })
+        .where(eq(userProfiles.userId, authUser.id))
+        .catch(() => {});
+    }
 
     const [prefs] = await db
       .select()

@@ -22,6 +22,10 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const anchorDate = searchParams.get('anchorDate') ?? undefined;
   const view = searchParams.get('view') ?? undefined;
+  const timezone =
+    searchParams.get('timezone') ??
+    req.headers.get('x-device-timezone') ??
+    undefined;
 
   const result = await getCalendarViewDataForUser(
     {
@@ -34,6 +38,7 @@ export async function GET(req: NextRequest) {
     {
       anchorDate,
       view,
+      timezone,
     }
   );
 
