@@ -5,6 +5,10 @@ import {
   resolveValidTimezone,
   shiftLocalDateString,
 } from '../queries/timezone';
+import {
+  combineLocalDateAndTimeToUtc,
+  extractLocalDateAndExactTime,
+} from '../tasks/validation';
 import type {
   CalendarEventAttachmentRow,
   CalendarEventRecurrenceRule,
@@ -223,11 +227,14 @@ export function serializeCalendarEventRow(
   const startAt = new Date(row.startAt);
   const endAt = new Date(row.endAt);
 
-  const startDate = getLocalDateString(startAt, tz);
-  const endDate = getLocalDateString(endAt, tz);
+  const startExtract = extractLocalDateAndExactTime(startAt, tz);
+  const endExtract = extractLocalDateAndExactTime(endAt, tz);
 
-  const startTime = row.isAllDay ? null : formatLocalTime(startAt, tz);
-  const endTime = row.isAllDay ? null : formatLocalTime(endAt, tz);
+  const startDate = startExtract.localDate ?? getLocalDateString(startAt, tz);
+  const endDate = endExtract.localDate ?? getLocalDateString(endAt, tz);
+
+  const startTime = row.isAllDay ? null : startExtract.localTime;
+  const endTime = row.isAllDay ? null : endExtract.localTime;
 
   const startMs = startAt.getTime();
   const endMs = endAt.getTime();
@@ -236,11 +243,13 @@ export function serializeCalendarEventRow(
   let displayTimeLabel = '';
   if (row.isAllDay) {
     displayTimeLabel = startDate === endDate ? `${startDate} (All day)` : `${startDate} – ${endDate} (All day)`;
-  } else if (startTime && endTime) {
+  } else {
+    const sFormatted = formatLocalTime(startAt, tz) ?? '';
+    const eFormatted = formatLocalTime(endAt, tz) ?? '';
     displayTimeLabel =
       startDate === endDate
-        ? `${startTime} – ${endTime}`
-        : `${startDate} ${startTime} – ${endDate} ${endTime}`;
+        ? `${sFormatted} – ${eFormatted}`
+        : `${startDate} ${sFormatted} – ${endDate} ${eFormatted}`;
   }
 
   const meetingDetails = row.meetingUrl ? detectMeetingPlatform(row.meetingUrl) : null;
@@ -492,26 +501,31 @@ export function validateCalendarEventInput(
   let endAt: Date;
 
   if (isAllDay) {
-    startAt = new Date(`${startDateStr}T00:00:00Z`);
-    // All day ends on next calendar day for full interval coverage
+    const sUtc = combineLocalDateAndTimeToUtc(startDateStr, '00:00', timezone);
+    // All day ends on next calendar day for full interval coverage in target timezone
     const nextDay = shiftLocalDateString(endDateStr, 1);
-    endAt = new Date(`${nextDay}T00:00:00Z`);
+    const eUtc = combineLocalDateAndTimeToUtc(nextDay, '00:00', timezone);
+    if (!sUtc || !eUtc) {
+      errors.startDate = 'Invalid date for event.';
+      return { ok: false, errors };
+    }
+    startAt = sUtc;
+    endAt = eUtc;
   } else {
-    // Combine date + time
-    const sIso = `${startDateStr}T${startTimeStr}:00`;
-    const eIso = `${endDateStr}T${endTimeStr}:00`;
-    startAt = new Date(sIso);
-    endAt = new Date(eIso);
+    const sUtc = combineLocalDateAndTimeToUtc(startDateStr, startTimeStr, timezone);
+    const eUtc = combineLocalDateAndTimeToUtc(endDateStr, endTimeStr, timezone);
 
-    // If parsing produced invalid date, report error
-    if (Number.isNaN(startAt.getTime())) {
+    if (!sUtc) {
       errors.startDate = 'Invalid start date and time.';
       return { ok: false, errors };
     }
-    if (Number.isNaN(endAt.getTime())) {
+    if (!eUtc) {
       errors.endDate = 'Invalid end date and time.';
       return { ok: false, errors };
     }
+
+    startAt = sUtc;
+    endAt = eUtc;
 
     if (endAt.getTime() <= startAt.getTime()) {
       errors.endTime = 'End time must be strictly after start time.';
@@ -590,15 +604,21 @@ export function expandRecurringInstances(
           ? baseEvent.id
           : `${baseEvent.id}_rec_${currentStart.getTime()}`;
 
-      const sDate = getLocalDateString(currentStart, baseEvent.timezone);
-      const eDate = getLocalDateString(currentEnd, baseEvent.timezone);
+      const startExtract = extractLocalDateAndExactTime(currentStart, baseEvent.timezone);
+      const endExtract = extractLocalDateAndExactTime(currentEnd, baseEvent.timezone);
+      const sDate = startExtract.localDate ?? getLocalDateString(currentStart, baseEvent.timezone);
+      const eDate = endExtract.localDate ?? getLocalDateString(currentEnd, baseEvent.timezone);
+      const sTime = baseEvent.isAllDay ? null : startExtract.localTime;
+      const eTime = baseEvent.isAllDay ? null : endExtract.localTime;
 
       results.push({
         ...baseEvent,
         id: instanceId,
         recurringEventId: baseEvent.id,
         startDate: sDate,
+        startTime: sTime,
         endDate: eDate,
+        endTime: eTime,
         startIso: currentStart.toISOString(),
         endIso: currentEnd.toISOString(),
       });

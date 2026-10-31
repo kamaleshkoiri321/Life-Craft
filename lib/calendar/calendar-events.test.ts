@@ -6,6 +6,7 @@ import {
   formatRecurrenceLabel,
   validateCalendarEventInput,
   expandRecurringInstances,
+  serializeCalendarEventRow,
   type CalendarEventCreateInput,
   type CalendarEventRow,
 } from './event-validation';
@@ -145,6 +146,55 @@ test('validateCalendarEventInput validates required fields and normalizes dates'
   assert.equal(valid.cleaned?.color, '#5938B5');
   assert.equal(valid.cleaned?.reminders.length, 2);
   assert.equal(valid.cleaned?.meetingUrl, 'https://meet.google.com/abc-defg-hij');
+
+  // Verify precise timezone conversion in Asia/Kathmandu (UTC + 05:45)
+  const kathmanduEvent = validateCalendarEventInput({
+    title: 'Kathmandu Standup',
+    startDate: '2026-10-31',
+    startTime: '10:30',
+    endDate: '2026-10-31',
+    endTime: '11:30',
+    timezone: 'Asia/Kathmandu',
+  });
+  assert.equal(kathmanduEvent.ok, true);
+  // 10:30 in Asia/Kathmandu (+05:45) corresponds to 04:45 UTC
+  assert.equal(
+    kathmanduEvent.cleaned?.startAt.toISOString(),
+    '2026-10-31T04:45:00.000Z'
+  );
+  assert.equal(
+    kathmanduEvent.cleaned?.endAt.toISOString(),
+    '2026-10-31T05:45:00.000Z'
+  );
+
+  // Round-trip serialization in Asia/Kathmandu
+  const serialized = serializeCalendarEventRow(
+    {
+      id: 'event-ktm-1',
+      userId: 'user-1',
+      title: 'Kathmandu Standup',
+      description: null,
+      notes: null,
+      category: 'Meeting',
+      color: '#5938B5',
+      startAt: kathmanduEvent.cleaned!.startAt,
+      endAt: kathmanduEvent.cleaned!.endAt,
+      isAllDay: false,
+      timezone: 'Asia/Kathmandu',
+      meetingUrl: null,
+      recurrenceRule: null,
+      recurringEventId: null,
+      reminders: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+    { timezone: 'Asia/Kathmandu' }
+  );
+  assert.equal(serialized.startDate, '2026-10-31');
+  assert.equal(serialized.startTime, '10:30');
+  assert.equal(serialized.endDate, '2026-10-31');
+  assert.equal(serialized.endTime, '11:30');
+  assert.equal(serialized.displayTimeLabel, '10:30 AM – 11:30 AM');
 });
 
 test('expandRecurringInstances correctly generates occurrences within period window', () => {
