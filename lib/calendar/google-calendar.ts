@@ -174,34 +174,30 @@ export function resolveGoogleCalendarRedirectUri(
 ): string {
   ensureGoogleCalendarEnvLoaded();
 
-  if (
-    requestOrigin &&
-    (requestOrigin.startsWith('http://localhost:3000') ||
-      requestOrigin.startsWith(DEFAULT_CLOUD_RUN_ORIGIN))
-  ) {
-    return requestOrigin.replace(/\/+$/, '');
-  }
-
   const configuredRedirect = process.env.GOOGLE_CALENDAR_REDIRECT_URI?.trim();
   if (
     configuredRedirect &&
     configuredRedirect.startsWith('http') &&
-    !configuredRedirect.includes('<your-app-origin>') &&
-    configuredRedirect !== 'http://localhost:3000/api/calendar/google/callback'
+    !configuredRedirect.includes('<your-app-origin>')
   ) {
-    return configuredRedirect.replace(/\/+$/, '');
+    if (configuredRedirect.includes('/api/calendar/google/callback')) {
+      return configuredRedirect;
+    }
+    return `${configuredRedirect.replace(/\/+$/, '')}/api/calendar/google/callback`;
   }
 
-  if (requestOrigin && requestOrigin.startsWith('http')) {
-    return requestOrigin.replace(/\/+$/, '');
-  }
+  const baseOrigin = (() => {
+    if (requestOrigin && requestOrigin.startsWith('http')) {
+      return requestOrigin.replace(/\/+$/, '');
+    }
+    const appUrl = process.env.APP_URL?.trim();
+    if (appUrl && appUrl.startsWith('http') && appUrl !== 'MY_APP_URL') {
+      return appUrl.replace(/\/+$/, '');
+    }
+    return DEFAULT_CLOUD_RUN_ORIGIN;
+  })();
 
-  const appUrl = process.env.APP_URL?.trim();
-  if (appUrl && appUrl.startsWith('http') && appUrl !== 'MY_APP_URL') {
-    return appUrl.replace(/\/+$/, '');
-  }
-
-  return DEFAULT_CLOUD_RUN_ORIGIN;
+  return `${baseOrigin}/api/calendar/google/callback`;
 }
 
 export function getGoogleCalendarConfigStatus(

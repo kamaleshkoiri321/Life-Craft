@@ -161,12 +161,19 @@ export default function GoogleCalendarModal({
 
   if (!isOpen) return null;
 
-  const effectiveRedirectUri =
-    typeof window !== 'undefined' &&
-    window.location.origin &&
-    !config.redirectUri.includes('/api/calendar/google/callback')
-      ? window.location.origin.replace(/\/+$/, '')
-      : config.redirectUri;
+  const effectiveRedirectUri = (() => {
+    if (
+      config.redirectUri &&
+      config.redirectUri.includes('/api/calendar/google/callback')
+    ) {
+      return config.redirectUri;
+    }
+    const origin =
+      typeof window !== 'undefined' && window.location.origin
+        ? window.location.origin.replace(/\/+$/, '')
+        : 'https://lifecraft-hero.vercel.app';
+    return `${origin}/api/calendar/google/callback`;
+  })();
 
   const handleCopyRedirectUri = async () => {
     try {
