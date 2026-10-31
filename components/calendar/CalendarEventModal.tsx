@@ -718,7 +718,7 @@ export default function CalendarEventModal({
                   {!isAllDay && (
                     <input
                       type="time"
-                      value={startTime}
+                      value={normalizeTo24HourTime(startTime, '09:00')}
                       onChange={(e) => handleStartTimeChange(e.target.value)}
                       className="w-24 rounded-lg border border-[#171622]/15 bg-white px-2 py-1.5 text-xs text-[#171622] focus:border-[#5938B5]"
                     />
@@ -740,7 +740,7 @@ export default function CalendarEventModal({
                   {!isAllDay && (
                     <input
                       type="time"
-                      value={endTime}
+                      value={normalizeTo24HourTime(endTime, '10:00')}
                       onChange={(e) => setEndTime(e.target.value)}
                       className="w-24 rounded-lg border border-[#171622]/15 bg-white px-2 py-1.5 text-xs text-[#171622] focus:border-[#5938B5]"
                     />

@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { shiftLocalDateString } from '@/lib/queries/timezone';
+import { normalizeTo24HourTime } from '@/lib/calendar/event-validation';
 import type {
   SerializedTaskItem,
   TaskPriority,
@@ -109,10 +110,12 @@ export default function TaskFormModal({
     isEdit && initialTask
       ? initialTask.scheduledDate ?? ''
       : defaultScheduledDate;
-  const initialSchedStart =
+  const initialSchedStart = normalizeTo24HourTime(
     isEdit && initialTask
       ? initialTask.scheduledStartTime ?? ''
-      : defaultScheduledStartTime;
+      : defaultScheduledStartTime,
+    ''
+  );
   const initialDuration =
     isEdit && initialTask && initialTask.durationMinutes
       ? initialTask.durationMinutes
@@ -125,7 +128,10 @@ export default function TaskFormModal({
           initialDuration
         )
       : {
-          endTime: isEdit && initialTask ? initialTask.scheduledEndTime ?? '' : '',
+          endTime: normalizeTo24HourTime(
+            isEdit && initialTask ? initialTask.scheduledEndTime ?? '' : '',
+            ''
+          ),
           endDate:
             isEdit && initialTask
               ? initialTask.scheduledEndDate ?? initialSchedDate
@@ -148,7 +154,10 @@ export default function TaskFormModal({
     isEdit && initialTask ? initialTask.dueDate ?? '' : defaultDueDate
   );
   const [dueTime, setDueTime] = useState(
-    isEdit && initialTask ? initialTask.dueTime ?? '' : ''
+    normalizeTo24HourTime(
+      isEdit && initialTask ? initialTask.dueTime ?? '' : '',
+      ''
+    )
   );
 
   // Phase 4B Calendar Scheduling state
@@ -557,7 +566,7 @@ export default function TaskFormModal({
                       id="task-scheduled-start-input"
                       name="scheduledStartTime"
                       type="time"
-                      value={scheduledStartTime}
+                      value={normalizeTo24HourTime(scheduledStartTime, '')}
                       onChange={(e) => handleStartTimeChange(e.target.value)}
                       className="w-full rounded-xl border border-[#171622]/12 bg-white px-2.5 py-2 text-xs text-[#171622] focus:border-[#5938B5] focus:outline-none"
                     />
@@ -574,7 +583,7 @@ export default function TaskFormModal({
                       id="task-scheduled-end-input"
                       name="scheduledEndTime"
                       type="time"
-                      value={scheduledEndTime}
+                      value={normalizeTo24HourTime(scheduledEndTime, '')}
                       onChange={(e) => {
                         setScheduledEndTime(e.target.value);
                         if (scheduledDate) {
@@ -667,7 +676,7 @@ export default function TaskFormModal({
                   id="task-due-time-input"
                   name="dueTime"
                   type="time"
-                  value={dueTime}
+                  value={normalizeTo24HourTime(dueTime, '')}
                   onChange={(e) => setDueTime(e.target.value)}
                   className="w-full rounded-xl border border-[#171622]/12 bg-[#FAF9F6] pl-9 pr-8 py-2 text-xs sm:text-sm text-[#171622] focus:border-[#5938B5] focus:bg-white focus:outline-none"
                 />
