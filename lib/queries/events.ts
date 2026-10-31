@@ -21,6 +21,10 @@ import {
   saveEventAttachmentFile,
 } from '../storage/event-attachments';
 import { resolveValidTimezone } from './timezone';
+import {
+  cancelEventNotifications,
+  syncEventNotifications,
+} from '../calendar/reminder-scheduler';
 
 export interface CalendarEventListFilters {
   startUtc?: Date;
@@ -246,6 +250,11 @@ export async function createCalendarEvent(
       })
       .returning();
 
+    // Synchronize pending notification schedule
+    await syncEventNotifications(inserted).catch((err) =>
+      console.error('[LifeCraft Notifications] sync error on create:', err)
+    );
+
     const serialized = serializeCalendarEventRow(inserted, {
       timezone: data.timezone,
       attachments: [],
@@ -313,6 +322,11 @@ export async function updateCalendarEvent(
     if (!updated) {
       return { status: 'not_found', message: 'Event not found.' };
     }
+
+    // Reschedule notifications based on updated start time and reminders
+    await syncEventNotifications(updated).catch((err) =>
+      console.error('[LifeCraft Notifications] sync error on update:', err)
+    );
 
     const attachments = await db
       .select()
@@ -382,6 +396,11 @@ export async function deleteCalendarEvent(
     if (!deleted) {
       return { status: 'not_found', message: 'Event not found.' };
     }
+
+    // Cancel any pending notifications for this event
+    await cancelEventNotifications(eventId).catch((err) =>
+      console.error('[LifeCraft Notifications] cancel error on delete:', err)
+    );
 
     return { status: 'ok', deletedEventId: deleted.id };
   } catch (err) {

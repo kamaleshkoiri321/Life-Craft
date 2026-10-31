@@ -133,6 +133,8 @@ test('buildDashboardPayload aggregates today tasks, habits, goals, notes, and 7-
       userId: 'user-123',
       theme: 'light',
       weekStartsOn: 1,
+      emailNotificationsEnabled: true,
+      defaultReminderMinutes: 15,
       createdAt: now,
       updatedAt: now,
     },

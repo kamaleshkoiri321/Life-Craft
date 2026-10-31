@@ -40,6 +40,8 @@ export const userPreferences = pgTable(
       .references(() => userProfiles.userId, { onDelete: 'cascade' }),
     theme: text('theme').notNull().default('light'),
     weekStartsOn: integer('week_starts_on').notNull().default(1),
+    emailNotificationsEnabled: boolean('email_notifications_enabled').notNull().default(true),
+    defaultReminderMinutes: integer('default_reminder_minutes').notNull().default(15),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -855,12 +857,66 @@ export const calendarEventAttachments = pgTable(
   ]
 );
 
+export type NotificationDeliveryStatus =
+  | 'pending'
+  | 'processing'
+  | 'sent'
+  | 'failed'
+  | 'cancelled'
+  | 'skipped';
+
+export const calendarEventNotifications = pgTable(
+  'calendar_event_notifications',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => userProfiles.userId, { onDelete: 'cascade' }),
+    eventId: uuid('event_id')
+      .notNull()
+      .references(() => calendarEvents.id, { onDelete: 'cascade' }),
+    reminderMinutes: integer('reminder_minutes').notNull(),
+    channel: text('channel').notNull().default('email'),
+    recipientEmail: text('recipient_email'),
+    scheduledFor: timestamp('scheduled_for', { withTimezone: true }).notNull(),
+    status: text('status').notNull().default('pending'),
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    errorMessage: text('error_message'),
+    retryCount: integer('retry_count').notNull().default(0),
+    messageId: text('message_id'),
+    idempotencyKey: text('idempotency_key').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('calendar_event_notifications_idempotency_unique').on(
+      table.idempotencyKey
+    ),
+    index('calendar_event_notifications_scheduled_status_idx').on(
+      table.status,
+      table.scheduledFor
+    ),
+    index('calendar_event_notifications_user_id_idx').on(table.userId),
+    index('calendar_event_notifications_event_id_idx').on(table.eventId),
+    check(
+      'calendar_event_notifications_status_check',
+      sql`${table.status} IN ('pending', 'processing', 'sent', 'failed', 'cancelled', 'skipped')`
+    ),
+  ]
+);
+
 export type UserProfileRow = typeof userProfiles.$inferSelect;
 export type UserPreferenceRow = typeof userPreferences.$inferSelect;
 export type TaskRow = typeof tasks.$inferSelect;
 export type CalendarEventRow = typeof calendarEvents.$inferSelect;
 export type CalendarEventAttachmentRow =
   typeof calendarEventAttachments.$inferSelect;
+export type CalendarEventNotificationRow =
+  typeof calendarEventNotifications.$inferSelect;
 export type GoogleCalendarConnectionRow =
   typeof googleCalendarConnections.$inferSelect;
 export type GoogleCalendarEventMappingRow =

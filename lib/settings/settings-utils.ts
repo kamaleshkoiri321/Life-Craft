@@ -61,6 +61,8 @@ export interface SettingsDataPayload {
   preferences: {
     theme: SettingsTheme;
     weekStartsOn: number;
+    emailNotificationsEnabled: boolean;
+    defaultReminderMinutes: number;
   };
   account: {
     providers: string[];
@@ -75,6 +77,8 @@ export interface ValidatedSettingsUpdate {
   theme?: SettingsTheme;
   timezone?: string;
   weekStartsOn?: number;
+  emailNotificationsEnabled?: boolean;
+  defaultReminderMinutes?: number;
 }
 
 const DATA_IMAGE_PREFIX_REGEX =
@@ -214,6 +218,32 @@ export function validateUpdateSettingsInput(
       };
     }
     update.weekStartsOn = parsed;
+    hasField = true;
+  }
+
+  if (rawInput.emailNotificationsEnabled !== undefined) {
+    if (typeof rawInput.emailNotificationsEnabled !== 'boolean') {
+      return {
+        ok: false,
+        message: 'emailNotificationsEnabled must be a boolean.',
+      };
+    }
+    update.emailNotificationsEnabled = rawInput.emailNotificationsEnabled;
+    hasField = true;
+  }
+
+  if (rawInput.defaultReminderMinutes !== undefined) {
+    const parsed =
+      typeof rawInput.defaultReminderMinutes === 'number'
+        ? rawInput.defaultReminderMinutes
+        : Number(rawInput.defaultReminderMinutes);
+    if (!Number.isInteger(parsed) || parsed < 0 || parsed > 10080) {
+      return {
+        ok: false,
+        message: 'defaultReminderMinutes must be between 0 and 10080 minutes.',
+      };
+    }
+    update.defaultReminderMinutes = parsed;
     hasField = true;
   }
 

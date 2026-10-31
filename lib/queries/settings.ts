@@ -87,6 +87,8 @@ export async function getSettingsForUser(
         preferences: {
           theme,
           weekStartsOn,
+          emailNotificationsEnabled: preferences.emailNotificationsEnabled ?? true,
+          defaultReminderMinutes: preferences.defaultReminderMinutes ?? 15,
         },
         account: {
           providers: [],
@@ -130,8 +132,15 @@ export async function updateSettingsForUser(
     const db = getDb();
     await ensureUserProfile(authUser);
 
-    const { displayName, image, theme, timezone, weekStartsOn } =
-      validation.value;
+    const {
+      displayName,
+      image,
+      theme,
+      timezone,
+      weekStartsOn,
+      emailNotificationsEnabled,
+      defaultReminderMinutes,
+    } = validation.value;
     const now = new Date();
 
     if (displayName !== undefined || timezone !== undefined) {
@@ -154,10 +163,17 @@ export async function updateSettingsForUser(
         .where(eq(schema.userProfiles.userId, authUser.id));
     }
 
-    if (theme !== undefined || weekStartsOn !== undefined) {
+    if (
+      theme !== undefined ||
+      weekStartsOn !== undefined ||
+      emailNotificationsEnabled !== undefined ||
+      defaultReminderMinutes !== undefined
+    ) {
       const prefPatch: {
         theme?: SettingsTheme;
         weekStartsOn?: number;
+        emailNotificationsEnabled?: boolean;
+        defaultReminderMinutes?: number;
         updatedAt: Date;
       } = { updatedAt: now };
 
@@ -166,6 +182,12 @@ export async function updateSettingsForUser(
       }
       if (weekStartsOn !== undefined) {
         prefPatch.weekStartsOn = weekStartsOn;
+      }
+      if (emailNotificationsEnabled !== undefined) {
+        prefPatch.emailNotificationsEnabled = emailNotificationsEnabled;
+      }
+      if (defaultReminderMinutes !== undefined) {
+        prefPatch.defaultReminderMinutes = defaultReminderMinutes;
       }
 
       await db

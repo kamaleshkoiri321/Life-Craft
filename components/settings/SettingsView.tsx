@@ -4,11 +4,16 @@ import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'reac
 import { UserProfile } from '@clerk/nextjs';
 import {
   AlertCircle,
+  Bell,
   Calendar,
+  Check,
   CheckCircle2,
   Globe,
+  Info,
   Loader2,
   LogOut,
+  Mail,
+  Send,
   Shield,
   Sliders,
   X,
@@ -56,6 +61,21 @@ interface SettingsViewProps {
   onSettingsMutated?: () => Promise<void> | void;
 }
 
+const REMINDER_PRESET_OPTIONS = [
+  { value: 0, label: 'At event start time' },
+  { value: 5, label: '5 minutes before' },
+  { value: 8, label: '8 minutes before' },
+  { value: 10, label: '10 minutes before' },
+  { value: 15, label: '15 minutes before' },
+  { value: 20, label: '20 minutes before' },
+  { value: 30, label: '30 minutes before' },
+  { value: 45, label: '45 minutes before' },
+  { value: 60, label: '1 hour before' },
+  { value: 120, label: '2 hours before' },
+  { value: 1440, label: '1 day before' },
+  { value: 10080, label: '1 week before' },
+];
+
 export default function SettingsView({
   initialTimezone,
   initialTheme,
@@ -64,12 +84,31 @@ export default function SettingsView({
   isSigningOut,
   onSettingsMutated,
 }: SettingsViewProps) {
-  const [activeTab, setActiveTab] = useState<'account' | 'preferences'>('account');
+  const [activeTab, setActiveTab] = useState<'account' | 'preferences' | 'notifications'>('account');
 
   // Preferences state hydrated from props and /api/settings
   const [theme, setTheme] = useState<SettingsTheme>(initialTheme);
   const [timezone, setTimezone] = useState(initialTimezone);
   const [weekStartsOn, setWeekStartsOn] = useState<number>(initialWeekStartsOn);
+  const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(true);
+  const [defaultReminderMinutes, setDefaultReminderMinutes] = useState(15);
+
+  // SMTP status state
+  const [smtpStatus, setSmtpStatus] = useState<{
+    isConfigured: boolean;
+    connectionHealthy: boolean;
+    connectionError?: string;
+    fromName: string;
+    testMode: boolean;
+    testRecipientConfigured: boolean;
+    testRecipient?: string;
+  } | null>(null);
+  const [isLoadingSmtpStatus, setIsLoadingSmtpStatus] = useState(false);
+  const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
+  const [testEmailBanner, setTestEmailBanner] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
 
   // Saving / busy states
   const [isSavingPreferences, setIsSavingPreferences] = useState(false);
@@ -112,7 +151,29 @@ export default function SettingsView({
     setTimezone(data.profile.timezone);
     setTheme(data.preferences.theme);
     setWeekStartsOn(data.preferences.weekStartsOn);
+    setEmailNotificationsEnabled(data.preferences.emailNotificationsEnabled ?? true);
+    setDefaultReminderMinutes(data.preferences.defaultReminderMinutes ?? 15);
     applyThemePreference(data.preferences.theme);
+  }, []);
+
+  // Fetch SMTP status
+  const fetchSmtpStatus = useCallback(async () => {
+    setIsLoadingSmtpStatus(true);
+    try {
+      const res = await fetch('/api/notifications/status', {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+      });
+      const data = await res.json();
+      if (res.ok && data.status === 'ok') {
+        setSmtpStatus(data);
+      }
+    } catch {
+      // Network error handled gracefully
+    } finally {
+      setIsLoadingSmtpStatus(false);
+    }
   }, []);
 
   // Load authoritative settings from /api/settings on mount
@@ -139,6 +200,12 @@ export default function SettingsView({
       cancelled = true;
     };
   }, [applyServerPayload]);
+
+  useEffect(() => {
+    if (activeTab === 'notifications') {
+      void fetchSmtpStatus();
+    }
+  }, [activeTab, fetchSmtpStatus]);
 
   const patchSettings = async (
     payload: Record<string, unknown>,
@@ -207,6 +274,70 @@ export default function SettingsView({
     }
   };
 
+  const handleToggleEmailNotifications = async (enabled: boolean) => {
+    const prev = emailNotificationsEnabled;
+    setEmailNotificationsEnabled(enabled);
+    setIsSavingPreferences(true);
+    try {
+      const ok = await patchSettings(
+        { emailNotificationsEnabled: enabled },
+        enabled ? 'Email notifications enabled.' : 'Email notifications disabled.'
+      );
+      if (!ok) {
+        setEmailNotificationsEnabled(prev);
+      }
+    } finally {
+      setIsSavingPreferences(false);
+    }
+  };
+
+  const handleDefaultReminderMinutesChange = async (mins: number) => {
+    const prev = defaultReminderMinutes;
+    setDefaultReminderMinutes(mins);
+    setIsSavingPreferences(true);
+    try {
+      const ok = await patchSettings(
+        { defaultReminderMinutes: mins },
+        `Default reminder set to ${mins} minutes before.`
+      );
+      if (!ok) {
+        setDefaultReminderMinutes(prev);
+      }
+    } finally {
+      setIsSavingPreferences(false);
+    }
+  };
+
+  const handleSendTestEmail = async () => {
+    setIsSendingTestEmail(true);
+    setTestEmailBanner(null);
+    try {
+      const res = await fetch('/api/notifications/test', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (res.ok && data.status === 'ok') {
+        setTestEmailBanner({
+          type: 'success',
+          message: data.message || 'Test email dispatched successfully!',
+        });
+      } else {
+        setTestEmailBanner({
+          type: 'error',
+          message: data.message || 'Failed to send test email. Please check server logs.',
+        });
+      }
+    } catch {
+      setTestEmailBanner({
+        type: 'error',
+        message: 'Network error while requesting test email.',
+      });
+    } finally {
+      setIsSendingTestEmail(false);
+    }
+  };
+
   return (
     <div className="max-w-4xl space-y-6 pb-12">
       {/* Page Header */}
@@ -216,7 +347,7 @@ export default function SettingsView({
             Settings
           </h1>
           <p className="text-sm sm:text-base text-[#171622]/65">
-            Manage your profile, authentication, security, and app preferences.
+            Manage your profile, authentication, regional settings, and email notifications.
           </p>
         </div>
 
@@ -254,6 +385,21 @@ export default function SettingsView({
           >
             <Sliders className="h-4 w-4 shrink-0 text-[#171622]" aria-hidden="true" />
             <span>App Preferences</span>
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'notifications'}
+            onClick={() => setActiveTab('notifications')}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs sm:text-sm font-semibold transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#171622] ${
+              activeTab === 'notifications'
+                ? 'bg-white text-[#171622] shadow-xs'
+                : 'text-[#171622]/70 hover:text-[#171622] hover:bg-white/40'
+            }`}
+          >
+            <Bell className="h-4 w-4 shrink-0 text-[#5938B5]" aria-hidden="true" />
+            <span>Notifications</span>
           </button>
         </div>
       </div>
@@ -301,46 +447,46 @@ export default function SettingsView({
               </div>
             }
           >
-              <UserProfile
-                routing="hash"
-                appearance={{
-                  variables: {
-                    colorPrimary: '#171622',
-                    colorBackground: '#FFFFFF',
-                    borderRadius: '0.75rem',
-                    fontFamily: 'inherit',
-                  },
-                  elements: {
-                    rootBox: 'w-full',
-                    cardBox:
-                      'w-full shadow-none border border-[#171622]/10 rounded-2xl bg-white overflow-hidden',
-                    card: 'shadow-none border-none p-2 sm:p-6 w-full',
-                    navbar: 'border-r border-[#171622]/8',
-                    navbarButton:
-                      'text-[#171622]/75 hover:text-[#171622] hover:bg-[#171622]/5 rounded-xl text-xs font-semibold py-2.5 px-3 transition-colors',
-                    navbarButtonActive:
-                      'bg-[#C8F27C] text-[#171622] font-bold shadow-none',
-                    headerTitle: 'font-display font-bold text-[#171622] text-xl',
-                    headerSubtitle: 'text-[#171622]/65 text-xs',
-                    profileSectionTitleText:
-                      'font-display font-bold text-[#171622] text-base',
-                    badge:
-                      'bg-[#C8F27C]/40 text-[#171622] font-semibold border border-[#171622]/10 text-xs',
-                    formButtonPrimary:
-                      'bg-[#171622] hover:bg-[#171622]/90 text-[#FAF9F6] rounded-xl text-xs font-semibold shadow-none py-2.5 px-4 transition-colors',
-                    formButtonReset:
-                      'border border-[#171622]/15 text-[#171622] rounded-xl hover:bg-[#FAF9F6] text-xs font-semibold shadow-none transition-colors',
-                  },
-                }}
-              />
-            </Suspense>
-          </div>
-        )}
+            <UserProfile
+              routing="hash"
+              appearance={{
+                variables: {
+                  colorPrimary: '#171622',
+                  colorBackground: '#FFFFFF',
+                  borderRadius: '0.75rem',
+                  fontFamily: 'inherit',
+                },
+                elements: {
+                  rootBox: 'w-full',
+                  cardBox:
+                    'w-full shadow-none border border-[#171622]/10 rounded-2xl bg-white overflow-hidden',
+                  card: 'shadow-none border-none p-2 sm:p-6 w-full',
+                  navbar: 'border-r border-[#171622]/8',
+                  navbarButton:
+                    'text-[#171622]/75 hover:text-[#171622] hover:bg-[#171622]/5 rounded-xl text-xs font-semibold py-2.5 px-3 transition-colors',
+                  navbarButtonActive:
+                    'bg-[#C8F27C] text-[#171622] font-bold shadow-none',
+                  headerTitle: 'font-display font-bold text-[#171622] text-xl',
+                  headerSubtitle: 'text-[#171622]/65 text-xs',
+                  profileSectionTitleText:
+                    'font-display font-bold text-[#171622] text-base',
+                  badge:
+                    'bg-[#C8F27C]/40 text-[#171622] font-semibold border border-[#171622]/10 text-xs',
+                  formButtonPrimary:
+                    'bg-[#171622] hover:bg-[#171622]/90 text-[#FAF9F6] rounded-xl text-xs font-semibold shadow-none py-2.5 px-4 transition-colors',
+                  formButtonReset:
+                    'border border-[#171622]/15 text-[#171622] rounded-xl hover:bg-[#FAF9F6] text-xs font-semibold shadow-none transition-colors',
+                },
+              }}
+            />
+          </Suspense>
+        </div>
+      )}
 
       {/* TAB 2: App Preferences (LifeCraft DB) */}
       {activeTab === 'preferences' && (
         <div className="space-y-6">
-          {/* 1. Timezone & Week Start */}
+          {/* Timezone & Week Start */}
           <section
             aria-labelledby="settings-preferences-heading"
             className="lifecraft-theme-surface rounded-2xl border border-[#171622]/10 bg-white p-6 sm:p-7 space-y-5"
@@ -419,7 +565,7 @@ export default function SettingsView({
             </div>
           </section>
 
-          {/* 2. Session Sign Out */}
+          {/* Session Sign Out */}
           <section
             aria-labelledby="settings-session-heading"
             className="lifecraft-theme-surface rounded-2xl border border-[#171622]/10 bg-white p-6 sm:p-7 space-y-4"
@@ -449,6 +595,179 @@ export default function SettingsView({
                   <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
                 )}
                 <span>{isSigningOut ? 'Signing out...' : 'Sign out'}</span>
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {/* TAB 3: Notifications & Email Testing */}
+      {activeTab === 'notifications' && (
+        <div className="space-y-6">
+          {/* SMTP Service Status Banner */}
+          <section className="rounded-2xl border border-[#171622]/10 bg-white p-6 sm:p-7 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-1">
+                <h2 className="font-display text-base sm:text-lg font-bold text-[#171622] flex items-center gap-2">
+                  <Mail className="h-5 w-5 text-[#5938B5]" />
+                  <span>Email Notification Delivery Service</span>
+                </h2>
+                <p className="text-xs sm:text-sm text-[#171622]/65">
+                  Automated reminders are delivered using Gmail SMTP with STARTTLS encryption.
+                </p>
+              </div>
+
+              <div>
+                {isLoadingSmtpStatus ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#171622]/60">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Checking SMTP status...</span>
+                  </span>
+                ) : smtpStatus?.isConfigured && smtpStatus.connectionHealthy ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-800">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                    <span>Gmail SMTP Connected</span>
+                  </span>
+                ) : smtpStatus?.isConfigured && !smtpStatus.connectionHealthy ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-xs font-bold text-amber-800">
+                    <AlertCircle className="h-3.5 w-3.5 text-amber-600" />
+                    <span>Authentication Error</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#171622]/5 border border-[#171622]/10 px-3 py-1 text-xs font-medium text-[#171622]/70">
+                    <span>Credentials Needed in .env.local</span>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Test Mode Notice Banner */}
+            {smtpStatus?.testMode && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-1 text-xs text-amber-900">
+                <div className="flex items-center gap-1.5 font-bold">
+                  <Info className="h-4 w-4 text-amber-700" />
+                  <span>Testing Mode Enabled (EMAIL_TEST_MODE=true)</span>
+                </div>
+                <p className="text-amber-800">
+                  All automated calendar reminders are currently restricted from sending to external users and will be redirected exclusively to your testing address: <strong className="font-mono">{smtpStatus.testRecipient || 'Not configured in EMAIL_TEST_RECIPIENT'}</strong>.
+                </p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs">
+              <div className="rounded-xl border border-[#171622]/8 bg-[#FAF9F6] p-3 space-y-0.5">
+                <span className="text-[#171622]/50 font-medium block">Sender Display Name</span>
+                <span className="font-bold text-[#171622]">{smtpStatus?.fromName || 'LifeCraft'}</span>
+              </div>
+              <div className="rounded-xl border border-[#171622]/8 bg-[#FAF9F6] p-3 space-y-0.5">
+                <span className="text-[#171622]/50 font-medium block">SMTP Host / Protocol</span>
+                <span className="font-bold text-[#171622]">smtp.gmail.com:587 (STARTTLS)</span>
+              </div>
+              <div className="rounded-xl border border-[#171622]/8 bg-[#FAF9F6] p-3 space-y-0.5">
+                <span className="text-[#171622]/50 font-medium block">Recipient Authentication</span>
+                <span className="font-bold text-[#171622]">Clerk Verified Primary Email</span>
+              </div>
+            </div>
+          </section>
+
+          {/* User Notification Preferences Card */}
+          <section className="rounded-2xl border border-[#171622]/10 bg-white p-6 sm:p-7 space-y-5">
+            <div className="space-y-1">
+              <h2 className="font-display text-base sm:text-lg font-bold text-[#171622]">
+                Calendar Reminder Preferences
+              </h2>
+              <p className="text-xs sm:text-sm text-[#171622]/65">
+                Customize whether you receive email notifications and your default reminder interval for new events.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {/* Toggle Email Notifications */}
+              <div className="flex items-center justify-between p-3.5 rounded-xl border border-[#171622]/10 bg-[#FAF9F6]">
+                <div className="space-y-0.5">
+                  <span className="text-xs font-bold text-[#171622] block">
+                    Enable Calendar Reminder Emails
+                  </span>
+                  <span className="text-[11px] text-[#171622]/60 block">
+                    Receive scheduled alerts for your upcoming meetings, tasks, and calendar events.
+                  </span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={emailNotificationsEnabled}
+                    disabled={isSavingPreferences}
+                    onChange={(e) => handleToggleEmailNotifications(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5938B5]"></div>
+                </label>
+              </div>
+
+              {/* Default Reminder Selector */}
+              <div className="space-y-1.5">
+                <label htmlFor="settings-default-reminder" className="block text-xs font-semibold text-[#171622]">
+                  Default Reminder Interval for New Events
+                </label>
+                <select
+                  id="settings-default-reminder"
+                  value={defaultReminderMinutes}
+                  disabled={isSavingPreferences}
+                  onChange={(e) => handleDefaultReminderMinutesChange(Number(e.target.value))}
+                  className="w-full sm:w-80 rounded-xl border border-[#171622]/15 bg-[#FAF9F6] px-3.5 py-2.5 text-sm text-[#171622] focus:bg-white focus:border-[#5938B5] focus:outline-none transition-colors"
+                >
+                  {REMINDER_PRESET_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </section>
+
+          {/* Test Email Delivery Card */}
+          <section className="rounded-2xl border border-[#171622]/10 bg-white p-6 sm:p-7 space-y-4">
+            <div className="space-y-1">
+              <h2 className="font-display text-base sm:text-lg font-bold text-[#171622] flex items-center gap-2">
+                <Send className="h-4 w-4 text-[#5938B5]" />
+                <span>Test Email Delivery</span>
+              </h2>
+              <p className="text-xs sm:text-sm text-[#171622]/65">
+                Dispatch an immediate test email to verify Gmail SMTP connectivity, template rendering, and Clerk recipient routing.
+              </p>
+            </div>
+
+            {testEmailBanner && (
+              <div
+                className={`flex items-start gap-2.5 rounded-xl border p-3 text-xs ${
+                  testEmailBanner.type === 'success'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                    : 'border-red-200 bg-red-50 text-red-900'
+                }`}
+              >
+                {testEmailBanner.type === 'success' ? (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                ) : (
+                  <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                )}
+                <span>{testEmailBanner.message}</span>
+              </div>
+            )}
+
+            <div>
+              <button
+                type="button"
+                onClick={handleSendTestEmail}
+                disabled={isSendingTestEmail}
+                className="inline-flex items-center gap-2 rounded-xl bg-[#5938B5] px-4 py-2.5 text-xs sm:text-sm font-bold text-white shadow-2xs hover:bg-[#4a2e9b] transition-all disabled:opacity-50"
+              >
+                {isSendingTestEmail ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                <span>{isSendingTestEmail ? 'Sending Test Email...' : 'Send Test Email'}</span>
               </button>
             </div>
           </section>
