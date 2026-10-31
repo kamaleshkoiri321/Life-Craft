@@ -1,6 +1,6 @@
 import { and, desc, eq } from 'drizzle-orm';
 import { getDb, isDatabaseConfigured } from '../db';
-import { googleCalendarEventMappings, tasks } from '../db/schema';
+import { tasks } from '../db/schema';
 import { ensureUserProfile, type AuthSessionUser } from './dashboard';
 import { DEFAULT_TIMEZONE, resolveValidTimezone } from './timezone';
 import {
@@ -95,31 +95,11 @@ export async function listTasksForUser(
       .orderBy(desc(tasks.createdAt))
       .limit(500);
 
-    const mappingMap = new Map<
-      string,
-      { googleEventId: string; googleHtmlLink: string | null }
-    >();
-    try {
-      const mappingRows = await db
-        .select()
-        .from(googleCalendarEventMappings)
-        .where(eq(googleCalendarEventMappings.userId, authUser.id));
-      for (const m of mappingRows) {
-        mappingMap.set(m.taskId, {
-          googleEventId: m.googleEventId,
-          googleHtmlLink: m.googleHtmlLink ?? null,
-        });
-      }
-    } catch {
-      // Gracefully proceed if Phase 4B mapping table is not yet migrated
-    }
-
     const now = new Date();
     const serializedAll = rows.map((row) =>
       serializeTaskRow(row, {
         timezone,
         now,
-        googleMapping: mappingMap.get(row.id) ?? null,
       })
     );
     const summary = computeTaskSummaryMetrics(serializedAll);
@@ -319,34 +299,9 @@ export async function updateTaskForUser(
       };
     }
 
-    let googleMapping: {
-      googleEventId: string;
-      googleHtmlLink?: string | null;
-    } | null = null;
-    try {
-      const [mRow] = await db
-        .select()
-        .from(googleCalendarEventMappings)
-        .where(
-          and(
-            eq(googleCalendarEventMappings.userId, authUser.id),
-            eq(googleCalendarEventMappings.taskId, updated.id)
-          )
-        )
-        .limit(1);
-      if (mRow) {
-        googleMapping = {
-          googleEventId: mRow.googleEventId,
-          googleHtmlLink: mRow.googleHtmlLink ?? null,
-        };
-      }
-    } catch {
-      // Ignore if mapping table not migrated yet
-    }
-
     return {
       status: 'ok',
-      task: serializeTaskRow(updated, { timezone, now, googleMapping }),
+      task: serializeTaskRow(updated, { timezone, now }),
     };
   } catch (err) {
     console.error('[LifeCraft Tasks] Failed to update task:', err);

@@ -42,21 +42,6 @@ export const HOUR_ROWS: HourRowDescriptor[] = Array.from(
   }
 );
 
-export interface ExternalGoogleCalendarEvent {
-  id: string;
-  title: string;
-  description: string | null;
-  isAllDay: boolean;
-  startIso: string | null; // UTC ISO string for timed events
-  endIso: string | null; // UTC ISO string for timed events
-  startDate: string | null; // YYYY-MM-DD for all-day events
-  endDate: string | null; // YYYY-MM-DD (exclusive) for all-day events
-  htmlLink: string | null;
-  location: string | null;
-  status: string;
-  linkedTaskId: string | null;
-}
-
 export interface CalendarDayDescriptor {
   dateKey: string; // YYYY-MM-DD
   dayOfMonth: number;
@@ -84,7 +69,7 @@ export interface CalendarPeriodRange {
 
 export interface CalendarTimedLayoutItem {
   id: string;
-  source: 'lifecraft_task' | 'google_calendar';
+  source: 'lifecraft_task';
   title: string;
   timeRangeLabel: string;
   startUtcMs: number;
@@ -102,13 +87,11 @@ export interface CalendarTimedLayoutItem {
   spansMidnightBefore: boolean;
   spansMidnightAfter: boolean;
   task?: SerializedTaskItem;
-  externalEvent?: ExternalGoogleCalendarEvent;
 }
 
 export interface CalendarDayScheduleData {
   dateKey: string;
   allDayTasks: SerializedTaskItem[];
-  allDayExternalEvents: ExternalGoogleCalendarEvent[];
   deadlineOnlyTasks: SerializedTaskItem[];
   timedItems: CalendarTimedLayoutItem[];
   conflictCount: number;
@@ -373,13 +356,11 @@ function getLocalMinutesSinceMidnight(
 
 /**
  * Computes non-destructive side-by-side column assignments and conflict metadata
- * for all timed events (LifeCraft scheduled tasks + external Google Calendar events)
- * occurring on a given local day.
+ * for all timed LifeCraft tasks occurring on a given local day.
  */
 export function buildDayScheduleData(params: {
   day: CalendarDayDescriptor;
   tasks: SerializedTaskItem[];
-  externalEvents?: ExternalGoogleCalendarEvent[];
   timezone?: string;
 }): CalendarDayScheduleData {
   const tz = resolveValidTimezone(params.timezone ?? DEFAULT_TIMEZONE);
@@ -388,19 +369,6 @@ export function buildDayScheduleData(params: {
   const dayEndMs = endUtc.getTime();
 
   const activeTasks = params.tasks.filter((t) => t.status !== 'archived');
-  const externalEvents = params.externalEvents ?? [];
-
-  // Track task IDs that are already represented to avoid duplicating linked Google events
-  const scheduledTaskIds = new Set(
-    activeTasks
-      .filter((t) => Boolean(t.scheduledStartAt && t.scheduledEndAt))
-      .map((t) => t.id)
-  );
-  const exportedGoogleEventIds = new Set(
-    activeTasks
-      .map((t) => t.googleEventId)
-      .filter((id): id is string => Boolean(id))
-  );
 
   // 1. All-day LifeCraft tasks overlapping this local day
   const allDayTasks = activeTasks.filter((t) => {
@@ -410,25 +378,16 @@ export function buildDayScheduleData(params: {
     return sMs < dayEndMs && eMs > dayStartMs;
   });
 
-  // 2. All-day external Google Calendar events overlapping this local day
-  const allDayExternalEvents = externalEvents.filter((ev) => {
-    if (!ev.isAllDay || !ev.startDate) return false;
-    if (ev.linkedTaskId && scheduledTaskIds.has(ev.linkedTaskId)) return false;
-    if (exportedGoogleEventIds.has(ev.id)) return false;
-    const endDate = ev.endDate || shiftLocalDateString(ev.startDate, 1);
-    return ev.startDate <= dateKey && endDate > dateKey;
-  });
-
-  // 3. Tasks with a deadline on this local day that do NOT have a scheduled time slot
+  // 2. Tasks with a deadline on this local day that do NOT have a scheduled time slot
   const deadlineOnlyTasks = activeTasks.filter((t) => {
     if (t.scheduledStartAt && t.scheduledEndAt) return false;
     return t.dueDate === dateKey;
   });
 
-  // 4. Timed items (LifeCraft scheduled timed tasks + timed Google Calendar events)
+  // 3. Timed items (LifeCraft scheduled timed tasks)
   interface RawTimedCandidate {
     id: string;
-    source: 'lifecraft_task' | 'google_calendar';
+    source: 'lifecraft_task';
     title: string;
     timeRangeLabel: string;
     startUtcMs: number;
@@ -439,7 +398,6 @@ export function buildDayScheduleData(params: {
     spansMidnightBefore: boolean;
     spansMidnightAfter: boolean;
     task?: SerializedTaskItem;
-    externalEvent?: ExternalGoogleCalendarEvent;
   }
 
   const rawTimed: RawTimedCandidate[] = [];
@@ -488,55 +446,6 @@ export function buildDayScheduleData(params: {
       spansMidnightBefore,
       spansMidnightAfter,
       task: t,
-    });
-  }
-
-  for (const ev of externalEvents) {
-    if (ev.isAllDay || !ev.startIso || !ev.endIso) continue;
-    if (ev.linkedTaskId && scheduledTaskIds.has(ev.linkedTaskId)) continue;
-    if (exportedGoogleEventIds.has(ev.id)) continue;
-
-    const sMs = new Date(ev.startIso).getTime();
-    const eMs = new Date(ev.endIso).getTime();
-    if (Number.isNaN(sMs) || Number.isNaN(eMs) || eMs <= sMs) continue;
-    if (sMs >= dayEndMs || eMs <= dayStartMs) continue;
-
-    const spansMidnightBefore = sMs < dayStartMs;
-    const spansMidnightAfter = eMs > dayEndMs;
-
-    const startMinutes = getLocalMinutesSinceMidnight(
-      Math.max(sMs, dayStartMs),
-      dateKey,
-      dayStartMs,
-      dayEndMs,
-      tz
-    );
-    const rawEndMinutes = getLocalMinutesSinceMidnight(
-      Math.min(eMs, dayEndMs),
-      dateKey,
-      dayStartMs,
-      dayEndMs,
-      tz
-    );
-    const endMinutes = Math.max(startMinutes + 5, rawEndMinutes);
-    const visualDurationMinutes = Math.max(25, endMinutes - startMinutes);
-
-    const sLabel = formatLocalTime(new Date(sMs), tz) ?? '';
-    const eLabel = formatLocalTime(new Date(eMs), tz) ?? '';
-
-    rawTimed.push({
-      id: `gcal:${ev.id}`,
-      source: 'google_calendar',
-      title: ev.title,
-      timeRangeLabel: sLabel && eLabel ? `${sLabel} – ${eLabel}` : '',
-      startUtcMs: sMs,
-      endUtcMs: eMs,
-      startMinutes,
-      endMinutes,
-      visualDurationMinutes,
-      spansMidnightBefore,
-      spansMidnightAfter,
-      externalEvent: ev,
     });
   }
 
@@ -653,7 +562,6 @@ export function buildDayScheduleData(params: {
   return {
     dateKey,
     allDayTasks,
-    allDayExternalEvents,
     deadlineOnlyTasks,
     timedItems,
     conflictCount,

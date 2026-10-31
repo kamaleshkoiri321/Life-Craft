@@ -9,23 +9,18 @@ import {
   CalendarClock,
   CheckCircle2,
   Clock,
-  ExternalLink,
+  Flag,
   Loader2,
-  MapPin,
   Pencil,
-  Send,
   Trash2,
   X,
 } from 'lucide-react';
 import { shiftLocalDateString } from '@/lib/queries/timezone';
 import type { SerializedTaskItem } from '@/lib/tasks/validation';
-import type { ExternalGoogleCalendarEvent } from '@/lib/calendar/calendar-utils';
 
 interface CalendarTaskDetailSheetProps {
   task: SerializedTaskItem | null;
-  externalEvent: ExternalGoogleCalendarEvent | null;
   conflictingTitles?: string[];
-  googleConnected: boolean;
   onClose: () => void;
   onEditTask: (task: SerializedTaskItem) => void;
   onDeleteTask: (task: SerializedTaskItem) => void;
@@ -33,7 +28,6 @@ interface CalendarTaskDetailSheetProps {
     taskId: string,
     patch: Record<string, unknown>
   ) => Promise<{ ok: boolean; error?: string }>;
-  onExportedToGoogle: () => Promise<void>;
 }
 
 function shiftTime24ByMinutes(
@@ -56,114 +50,17 @@ function shiftTime24ByMinutes(
 
 export default function CalendarTaskDetailSheet({
   task,
-  externalEvent,
   conflictingTitles = [],
-  googleConnected,
   onClose,
   onEditTask,
   onDeleteTask,
   onQuickUpdateTask,
-  onExportedToGoogle,
 }: CalendarTaskDetailSheetProps) {
   const [isBusy, setIsBusy] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'error';
     message: string;
   } | null>(null);
-
-  if (!task && !externalEvent) return null;
-
-  // External Google Calendar Event Detail Modal
-  if (externalEvent && !task) {
-    return (
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-[#171622]/45 p-4 backdrop-blur-[2px]"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="calendar-external-event-title"
-      >
-        <div
-          className="fixed inset-0"
-          aria-hidden="true"
-          onClick={onClose}
-        />
-        <div className="relative z-10 w-full max-w-md rounded-2xl border border-[#171622]/12 bg-white p-6 shadow-2xl space-y-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="space-y-1">
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#1D4ED8]">
-                <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>Google Calendar · External Event</span>
-              </span>
-              <h2
-                id="calendar-external-event-title"
-                className="font-display text-lg font-bold text-[#171622]"
-              >
-                {externalEvent.title}
-              </h2>
-            </div>
-
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close event details"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#171622]/60 hover:bg-[#171622]/5 hover:text-[#171622]"
-            >
-              <X className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </div>
-
-          <div className="rounded-xl border border-[#171622]/10 bg-[#FAF9F6] p-3.5 space-y-2 text-xs text-[#171622]/80">
-            <div className="flex items-center gap-2">
-              <Clock className="h-3.5 w-3.5 text-[#171622]/55" />
-              <span>
-                {externalEvent.isAllDay
-                  ? `All day (${externalEvent.startDate})`
-                  : externalEvent.startIso && externalEvent.endIso
-                    ? `${new Date(externalEvent.startIso).toLocaleString()} – ${new Date(externalEvent.endIso).toLocaleTimeString()}`
-                    : 'Scheduled event'}
-              </span>
-            </div>
-            {externalEvent.location && (
-              <div className="flex items-center gap-2">
-                <MapPin className="h-3.5 w-3.5 text-[#171622]/55" />
-                <span>{externalEvent.location}</span>
-              </div>
-            )}
-          </div>
-
-          {externalEvent.description && (
-            <p className="text-xs sm:text-sm text-[#171622]/75 whitespace-pre-wrap leading-relaxed">
-              {externalEvent.description}
-            </p>
-          )}
-
-          <div className="flex items-center justify-between gap-3 pt-2">
-            {externalEvent.htmlLink ? (
-              <a
-                href={externalEvent.htmlLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#1D4ED8] hover:underline"
-              >
-                <span>Open in Google Calendar</span>
-                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-              </a>
-            ) : (
-              <span />
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl bg-[#171622] px-4 py-2 text-xs font-semibold text-[#FAF9F6] hover:bg-[#171622]/90"
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   if (!task) return null;
 
@@ -282,42 +179,6 @@ export default function CalendarTaskDetailSheet({
     }
   };
 
-  const handleExportToGoogle = async () => {
-    setFeedback(null);
-    setIsExporting(true);
-    try {
-      const res = await fetch('/api/calendar/google/export', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ taskId: task.id }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setFeedback({
-          type: 'error',
-          message:
-            data.message || 'Could not export this task to Google Calendar.',
-        });
-        return;
-      }
-
-      setFeedback({
-        type: 'success',
-        message:
-          data.message || 'Task exported to your primary Google Calendar.',
-      });
-      await onExportedToGoogle();
-    } catch {
-      setFeedback({
-        type: 'error',
-        message: 'Network error while exporting to Google Calendar.',
-      });
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-[#171622]/45 p-4 backdrop-blur-[2px] overflow-y-auto"
@@ -329,7 +190,7 @@ export default function CalendarTaskDetailSheet({
         className="fixed inset-0"
         aria-hidden="true"
         onClick={() => {
-          if (!isBusy && !isExporting) onClose();
+          if (!isBusy) onClose();
         }}
       />
 
@@ -525,54 +386,6 @@ export default function CalendarTaskDetailSheet({
           </div>
         )}
 
-        {/* Google Calendar Export Section */}
-        {task.scheduledStartAt && task.scheduledEndAt && (
-          <div className="rounded-xl border border-[#171622]/10 bg-[#FAF9F6]/60 p-3.5 flex flex-wrap items-center justify-between gap-3">
-            {task.googleEventId ? (
-              <div className="flex items-center gap-2 text-xs font-semibold text-[#2F6B1E]">
-                <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>Exported to Google Calendar</span>
-                {task.googleHtmlLink && (
-                  <a
-                    href={task.googleHtmlLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-[#1D4ED8] hover:underline ml-1"
-                  >
-                    <span>View</span>
-                    <ExternalLink className="h-3 w-3" aria-hidden="true" />
-                  </a>
-                )}
-              </div>
-            ) : (
-              <>
-                <span className="text-xs text-[#171622]/75">
-                  {googleConnected
-                    ? 'Export this scheduled block to your Google Calendar'
-                    : 'Connect Google Calendar to export scheduled tasks'}
-                </span>
-                <button
-                  type="button"
-                  disabled={!googleConnected || isExporting}
-                  onClick={handleExportToGoogle}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-[#171622]/15 bg-white px-3 py-1.5 text-xs font-semibold text-[#171622] hover:bg-[#171622]/5 disabled:opacity-50 whitespace-nowrap"
-                >
-                  {isExporting ? (
-                    <Loader2
-                      className="h-3.5 w-3.5 animate-spin"
-                      aria-hidden="true"
-                    />
-                  ) : (
-                    <Send className="h-3.5 w-3.5" aria-hidden="true" />
-                  )}
-                  <span>
-                    {isExporting ? 'Exporting...' : 'Export to Google Calendar'}
-                  </span>
-                </button>
-              </>
-            )}
-          </div>
-        )}
 
         {/* Footer Actions */}
         <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-[#171622]/10">

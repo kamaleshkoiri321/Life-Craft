@@ -1,7 +1,6 @@
 import { and, desc, eq, gte, isNull, lt, gt, ne, or } from 'drizzle-orm';
 import { getDb, isDatabaseConfigured } from '../db';
 import {
-  googleCalendarEventMappings,
   tasks,
   userPreferences,
 } from '../db/schema';
@@ -19,15 +18,7 @@ import {
   getCalendarPeriodRange,
   isValidCalendarView,
   type CalendarViewMode,
-  type ExternalGoogleCalendarEvent,
 } from '../calendar/calendar-utils';
-import {
-  fetchGoogleCalendarEventsForRange,
-  getGoogleCalendarConfigStatus,
-  getGoogleCalendarConnectionSummary,
-  type GoogleCalendarConfigStatus,
-  type GoogleCalendarConnectionSummary,
-} from '../calendar/google-calendar';
 
 export interface CalendarDataPayload {
   timezone: string;
@@ -40,10 +31,6 @@ export interface CalendarDataPayload {
   headingLabel: string;
   rangeTasks: SerializedTaskItem[];
   unscheduledTasks: SerializedTaskItem[];
-  externalEvents: ExternalGoogleCalendarEvent[];
-  googleWarning: string | null;
-  googleConfig: GoogleCalendarConfigStatus;
-  googleConnection: GoogleCalendarConnectionSummary;
 }
 
 export type CalendarQueryResult =
@@ -61,8 +48,6 @@ export async function getCalendarViewDataForUser(
   options?: {
     anchorDate?: string;
     view?: string;
-    includeExternal?: boolean;
-    requestOrigin?: string;
   }
 ): Promise<CalendarQueryResult> {
   if (!isDatabaseConfigured()) {
@@ -140,31 +125,10 @@ export async function getCalendarViewDataForUser(
       .orderBy(desc(tasks.createdAt))
       .limit(30);
 
-    // Fetch Google Calendar export mappings for this user
-    const mappingMap = new Map<
-      string,
-      { googleEventId: string; googleHtmlLink: string | null }
-    >();
-    try {
-      const mappingRows = await db
-        .select()
-        .from(googleCalendarEventMappings)
-        .where(eq(googleCalendarEventMappings.userId, authUser.id));
-      for (const m of mappingRows) {
-        mappingMap.set(m.taskId, {
-          googleEventId: m.googleEventId,
-          googleHtmlLink: m.googleHtmlLink ?? null,
-        });
-      }
-    } catch {
-      // Proceed if mapping table not yet migrated
-    }
-
     const rangeTasks = rangeTaskRows.map((row) =>
       serializeTaskRow(row, {
         timezone,
         now,
-        googleMapping: mappingMap.get(row.id) ?? null,
       })
     );
 
@@ -172,33 +136,8 @@ export async function getCalendarViewDataForUser(
       serializeTaskRow(row, {
         timezone,
         now,
-        googleMapping: mappingMap.get(row.id) ?? null,
       })
     );
-
-    const googleConfig = getGoogleCalendarConfigStatus(options?.requestOrigin);
-    let googleConnection = await getGoogleCalendarConnectionSummary(
-      authUser.id
-    );
-
-    let externalEvents: ExternalGoogleCalendarEvent[] = [];
-    let googleWarning: string | null = null;
-
-    if (googleConnection.connected && options?.includeExternal !== false) {
-      const externalResult = await fetchGoogleCalendarEventsForRange({
-        userId: authUser.id,
-        startUtc: period.startUtc,
-        endUtc: period.endUtc,
-      });
-      externalEvents = externalResult.events;
-      googleWarning = externalResult.warningMessage;
-
-      if (googleWarning) {
-        googleConnection = await getGoogleCalendarConnectionSummary(
-          authUser.id
-        );
-      }
-    }
 
     return {
       status: 'ok',
@@ -213,10 +152,6 @@ export async function getCalendarViewDataForUser(
         headingLabel: period.headingLabel,
         rangeTasks,
         unscheduledTasks,
-        externalEvents,
-        googleWarning,
-        googleConfig,
-        googleConnection,
       },
     };
   } catch (err) {

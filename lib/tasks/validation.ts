@@ -102,8 +102,6 @@ export interface SerializedTaskItem {
   scheduledEndTime: string | null; // HH:mm (24h) in user's timezone (null if all-day)
   durationMinutes: number | null;
   scheduleDisplayLabel: string | null; // e.g. "Today · 9:00 AM – 10:00 AM" or "Oct 28 · All day"
-  googleEventId?: string | null;
-  googleHtmlLink?: string | null;
   isOverdue: boolean;
   isDueToday: boolean;
   completedAt: string | null;
@@ -897,10 +895,6 @@ export function serializeTaskRow(
   options?: {
     timezone?: string;
     now?: Date;
-    googleMapping?: {
-      googleEventId: string;
-      googleHtmlLink?: string | null;
-    } | null;
   }
 ): SerializedTaskItem {
   const tz = resolveValidTimezone(options?.timezone);
@@ -1062,8 +1056,6 @@ export function serializeTaskRow(
     scheduledEndTime,
     durationMinutes,
     scheduleDisplayLabel,
-    googleEventId: options?.googleMapping?.googleEventId ?? null,
-    googleHtmlLink: options?.googleMapping?.googleHtmlLink ?? null,
     isOverdue,
     isDueToday,
     completedAt: row.completedAt

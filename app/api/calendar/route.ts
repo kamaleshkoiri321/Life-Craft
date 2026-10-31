@@ -4,28 +4,6 @@ import { getCalendarViewDataForUser } from '@/lib/queries/calendar';
 
 export const dynamic = 'force-dynamic';
 
-function resolveRequestOrigin(req: NextRequest): string {
-  const appUrl = process.env.APP_URL?.trim();
-  if (appUrl && appUrl.startsWith('http') && appUrl !== 'MY_APP_URL') {
-    return appUrl.replace(/\/+$/, '');
-  }
-  const forwardedHost = req.headers.get('x-forwarded-host');
-  const host = req.headers.get('host');
-  const proto = req.headers.get('x-forwarded-proto') || 'https';
-  if (forwardedHost) {
-    return `${proto}://${forwardedHost}`;
-  }
-  if (host) {
-    const scheme = host.startsWith('localhost') ? 'http' : proto;
-    return `${scheme}://${host}`;
-  }
-  try {
-    return new URL(req.url).origin;
-  } catch {
-    return 'http://localhost:3000';
-  }
-}
-
 export async function GET(req: NextRequest) {
   const sessionResult = await getResilientServerSession();
   const user = sessionResult?.data?.user;
@@ -44,8 +22,6 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const anchorDate = searchParams.get('anchorDate') ?? undefined;
   const view = searchParams.get('view') ?? undefined;
-  const includeExternal = searchParams.get('includeExternal') !== 'false';
-  const requestOrigin = resolveRequestOrigin(req);
 
   const result = await getCalendarViewDataForUser(
     {
@@ -58,8 +34,6 @@ export async function GET(req: NextRequest) {
     {
       anchorDate,
       view,
-      includeExternal,
-      requestOrigin,
     }
   );
 

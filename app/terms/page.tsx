@@ -121,7 +121,6 @@ export default function TermsPage() {
                 <li>Personal markdown notes and journal entries with folder organization and tags.</li>
                 <li>Pomodoro Focus Studio and stopwatch sessions for intentional work.</li>
                 <li>Personal library for document reading (PDF/EPUB) and progress bookmarks.</li>
-                <li>Optional Google Calendar OAuth integration for viewing primary calendar events.</li>
               </ul>
               <p>
                 We reserve the right to improve, modify, update, or discontinue features of the Service to enhance performance, reliability, and security.
@@ -168,15 +167,14 @@ export default function TermsPage() {
             {/* 6. Third-Party Integrations & Services */}
             <section className="space-y-3">
               <h2 className="font-display text-xl sm:text-2xl font-bold text-[#171622]">
-                6. Third-Party Services & Google Calendar
+                6. Third-Party Services & Authentication
               </h2>
               <p>
-                The Service integrates with third-party providers including Google Calendar and Clerk. Your use of these third-party services is subject to their respective terms and policies:
+                The Service integrates with trusted third-party providers including Clerk for authentication and Neon for database hosting. Your use of these third-party services is subject to their respective terms and policies:
               </p>
               <ul className="list-disc pl-5 space-y-1.5 text-xs sm:text-sm">
-                <li>Google Calendar access is subject to the <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#5938B5] underline">Google Terms of Service</a> and <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#5938B5] underline">Google API Services User Data Policy</a>.</li>
-                <li>Authentication is powered by Clerk and subject to the Clerk terms.</li>
-                <li>LifeCraft is not liable for service interruptions, changes, or downtime caused by third-party platforms.</li>
+                <li>Authentication is powered by Clerk and subject to Clerk terms of service.</li>
+                <li>LifeCraft is not liable for service interruptions, changes, or downtime caused by external infrastructure platforms.</li>
               </ul>
             </section>
 

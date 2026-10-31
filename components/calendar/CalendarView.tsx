@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
 import {
   AlertTriangle,
   Calendar as CalendarIcon,
@@ -9,7 +8,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  ExternalLink,
   Flag,
   Layers,
   Loader2,
@@ -24,22 +22,16 @@ import {
   shiftCalendarAnchorDate,
   type CalendarTimedLayoutItem,
   type CalendarViewMode,
-  type ExternalGoogleCalendarEvent,
 } from '@/lib/calendar/calendar-utils';
 import type {
   CalendarDataPayload,
   CalendarQueryResult,
 } from '@/lib/queries/calendar';
-import type {
-  GoogleCalendarConfigStatus,
-  GoogleCalendarConnectionSummary,
-} from '@/lib/calendar/google-calendar';
 import TaskFormModal, {
   type TaskFormSubmitPayload,
 } from '@/components/tasks/TaskFormModal';
 import DeleteTaskDialog from '@/components/tasks/DeleteTaskDialog';
 import CalendarTaskDetailSheet from './CalendarTaskDetailSheet';
-import GoogleCalendarModal from './GoogleCalendarModal';
 
 interface CalendarViewProps {
   todayLocalDate: string;
@@ -56,42 +48,11 @@ interface InitialSchedulePrefill {
 
 const HOUR_ROW_HEIGHT_PX = 60; // 1px per minute across 24 hours (1440px total)
 
-const DEFAULT_GOOGLE_CONFIG: GoogleCalendarConfigStatus = {
-  isConfigured: false,
-  hasClientId: false,
-  hasClientSecret: false,
-  hasEncryptionKey: false,
-  missingEnvVars: [
-    'GOOGLE_CALENDAR_CLIENT_ID',
-    'GOOGLE_CALENDAR_CLIENT_SECRET',
-    'GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY',
-  ],
-  redirectUri: '',
-  requiredScopes: [
-    'openid',
-    'email',
-    'https://www.googleapis.com/auth/calendar.events',
-  ],
-};
-
-const DEFAULT_GOOGLE_CONNECTION: GoogleCalendarConnectionSummary = {
-  connected: false,
-  status: 'disconnected',
-  googleEmail: null,
-  googleAccountId: null,
-  calendarId: 'primary',
-  grantedScopes: [],
-  connectedAt: null,
-  lastError: null,
-};
-
 export default function CalendarView({
   todayLocalDate,
   timezone,
   onTasksMutated,
 }: CalendarViewProps) {
-  const searchParams = useSearchParams();
-
   const [viewMode, setViewMode] = useState<CalendarViewMode>('week');
   const [anchorDate, setAnchorDate] = useState<string>(todayLocalDate);
   const [selectedDate, setSelectedDate] = useState<string>(todayLocalDate);
@@ -104,30 +65,7 @@ export default function CalendarView({
   const [bannerNotice, setBannerNotice] = useState<{
     type: 'success' | 'error';
     message: string;
-  } | null>(() => {
-    const gcalStatus = searchParams.get('gcal_status');
-    const gcalMessage = searchParams.get('gcal_message');
-    if (gcalStatus === 'connected') {
-      return {
-        type: 'success',
-        message:
-          gcalMessage ||
-          'Google Calendar connected! Your primary calendar events are now visible in your schedule.',
-      };
-    }
-    if (
-      gcalStatus === 'error' ||
-      gcalStatus === 'cancelled' ||
-      gcalStatus === 'unconfigured'
-    ) {
-      return {
-        type: 'error',
-        message:
-          gcalMessage || 'Could not complete Google Calendar connection.',
-      };
-    }
-    return null;
-  });
+  } | null>(null);
 
   // Modals & sheets state
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -138,12 +76,9 @@ export default function CalendarView({
     useState<InitialSchedulePrefill | null>(null);
 
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
-  const [detailExternalEvent, setDetailExternalEvent] =
-    useState<ExternalGoogleCalendarEvent | null>(null);
   const [deletingTask, setDeletingTask] = useState<SerializedTaskItem | null>(
     null
   );
-  const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
   const [showUnscheduledTray, setShowUnscheduledTray] = useState(false);
 
   const timeGridScrollRef = useRef<HTMLDivElement | null>(null);
@@ -274,11 +209,6 @@ export default function CalendarView({
     () => calendarData?.unscheduledTasks ?? [],
     [calendarData?.unscheduledTasks]
   );
-  const externalEvents = useMemo(
-    () => calendarData?.externalEvents ?? [],
-    [calendarData?.externalEvents]
-  );
-
   // Combine rangeTasks + unscheduledTasks for lookup by ID
   const allKnownTasks = useMemo(() => {
     const map = new Map<string, SerializedTaskItem>();
@@ -296,13 +226,12 @@ export default function CalendarView({
         buildDayScheduleData({
           day,
           tasks: rangeTasks,
-          externalEvents,
           timezone: activeTimezone,
         })
       );
     }
     return map;
-  }, [period.days, rangeTasks, externalEvents, activeTimezone]);
+  }, [period.days, rangeTasks, activeTimezone]);
 
   const detailTask = useMemo(
     () =>
@@ -457,10 +386,6 @@ export default function CalendarView({
     return res;
   };
 
-  const googleConfig = calendarData?.googleConfig ?? DEFAULT_GOOGLE_CONFIG;
-  const googleConnection =
-    calendarData?.googleConnection ?? DEFAULT_GOOGLE_CONNECTION;
-
   const renderHourlyItemBlock = (item: CalendarTimedLayoutItem) => {
     const topPx = (item.startMinutes / 60) * HOUR_ROW_HEIGHT_PX;
     const heightPx = Math.max(
@@ -470,44 +395,6 @@ export default function CalendarView({
 
     const widthPercent = 100 / item.totalColumns;
     const leftPercent = item.columnIndex * widthPercent;
-
-    if (item.source === 'google_calendar' && item.externalEvent) {
-      const ext = item.externalEvent;
-      return (
-        <button
-          key={item.id}
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setDetailTaskId(null);
-            setDetailExternalEvent(ext);
-          }}
-          style={{
-            top: `${topPx}px`,
-            height: `${heightPx}px`,
-            left: `calc(${leftPercent}% + 2px)`,
-            width: `calc(${widthPercent}% - 4px)`,
-          }}
-          className="absolute z-10 overflow-hidden rounded-xl border border-[#3B82F6]/30 bg-[#EFF6FF]/95 px-2.5 py-1.5 text-left shadow-2xs transition-all hover:border-[#2563EB] hover:shadow-sm focus-visible:outline-2 focus-visible:outline-[#2563EB]"
-          title={`${ext.title} (${item.timeRangeLabel}) • Google Calendar`}
-        >
-          <div className="flex items-center justify-between gap-1">
-            <span className="truncate text-[11px] font-bold text-[#1E3A8A]">
-              {ext.title}
-            </span>
-            <span className="inline-flex items-center gap-0.5 rounded bg-[#DBEAFE] px-1 py-0.5 text-[9px] font-semibold text-[#1D4ED8] shrink-0">
-              Google
-              {ext.htmlLink && <ExternalLink className="h-2.5 w-2.5" />}
-            </span>
-          </div>
-          {heightPx >= 40 && (
-            <p className="mt-0.5 truncate text-[10px] font-medium text-[#1E40AF]/80 tabular-nums">
-              {item.timeRangeLabel}
-            </p>
-          )}
-        </button>
-      );
-    }
 
     const task = item.task;
     if (!task) return null;
@@ -526,7 +413,6 @@ export default function CalendarView({
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          setDetailExternalEvent(null);
           setDetailTaskId(task.id);
         }}
         style={{
@@ -564,14 +450,6 @@ export default function CalendarView({
                 <span>Overlap</span>
               </span>
             )}
-            {task.googleEventId && (
-              <span
-                className="inline-flex h-4 w-4 items-center justify-center rounded bg-[#EBE8F8] text-[9px] font-bold text-[#5938B5]"
-                title="Exported to Google Calendar"
-              >
-                G
-              </span>
-            )}
           </div>
         </div>
         {heightPx >= 40 && (
@@ -598,33 +476,11 @@ export default function CalendarView({
             </span>
           </div>
           <p className="text-sm text-[#171622]/65">
-            Time-block your day, manage deadlines separately from scheduled hours,
-            and sync with Google Calendar.
+            Time-block your day and manage deadlines with LifeCraft&apos;s native schedule.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* Google Calendar Integration Trigger */}
-          <button
-            type="button"
-            onClick={() => setIsGoogleModalOpen(true)}
-            className={`inline-flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-xs font-semibold transition-colors ${
-              googleConnection.connected
-                ? 'border-[#4D7C0F]/25 bg-[#ECFCCB]/60 text-[#365314] hover:bg-[#ECFCCB]'
-                : 'border-[#171622]/12 bg-white text-[#171622] hover:bg-[#FAF9F6]'
-            }`}
-          >
-            <CalendarIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>
-              {googleConnection.connected
-                ? `Google Calendar (${googleConnection.googleEmail || 'Connected'})`
-                : 'Google Calendar'}
-            </span>
-            {googleConnection.connected && (
-              <span className="h-2 w-2 rounded-full bg-[#4D7C0F]" />
-            )}
-          </button>
-
           {/* Unscheduled Tasks Tray Toggle */}
           <button
             type="button"
@@ -679,25 +535,6 @@ export default function CalendarView({
         </div>
       )}
 
-      {/* Google Calendar Warning Banner (e.g., expired token) */}
-      {calendarData?.googleWarning && (
-        <div
-          role="status"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#D97706]/30 bg-[#FFFBEB] px-4 py-3 text-xs sm:text-sm text-[#92400E]"
-        >
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-[#D97706]" />
-            <span>{calendarData.googleWarning}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsGoogleModalOpen(true)}
-            className="text-xs font-semibold underline underline-offset-2"
-          >
-            Manage connection
-          </button>
-        </div>
-      )}
 
       {/* Unscheduled Tasks Quick-Schedule Bar */}
       {showUnscheduledTray && (
@@ -896,8 +733,7 @@ export default function CalendarView({
               const allItemsCount =
                 (dayData?.allDayTasks.length ?? 0) +
                 (dayData?.timedItems.length ?? 0) +
-                (dayData?.deadlineOnlyTasks.length ?? 0) +
-                (dayData?.allDayExternalEvents.length ?? 0);
+                (dayData?.deadlineOnlyTasks.length ?? 0);
 
               return (
                 <div
@@ -958,7 +794,6 @@ export default function CalendarView({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setDetailExternalEvent(null);
                           setDetailTaskId(task.id);
                         }}
                         className="w-full truncate rounded-md bg-[#EBE8F8] px-1.5 py-0.5 text-left text-[11px] font-semibold text-[#171622] hover:bg-[#ded9f4]"
@@ -968,25 +803,6 @@ export default function CalendarView({
                     ))}
 
                     {dayData?.timedItems.slice(0, 3).map((item) => {
-                      if (
-                        item.source === 'google_calendar' &&
-                        item.externalEvent
-                      ) {
-                        return (
-                          <button
-                            key={`m-ext-${item.id}`}
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDetailTaskId(null);
-                              setDetailExternalEvent(item.externalEvent!);
-                            }}
-                            className="w-full truncate rounded-md border border-[#3B82F6]/30 bg-[#EFF6FF] px-1.5 py-0.5 text-left text-[11px] font-medium text-[#1E3A8A]"
-                          >
-                            {item.externalEvent.title}
-                          </button>
-                        );
-                      }
                       if (!item.task) return null;
                       return (
                         <button
@@ -994,7 +810,6 @@ export default function CalendarView({
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setDetailExternalEvent(null);
                             setDetailTaskId(item.task!.id);
                           }}
                           className={`w-full truncate rounded-md border px-1.5 py-0.5 text-left text-[11px] font-medium ${
@@ -1017,7 +832,6 @@ export default function CalendarView({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setDetailExternalEvent(null);
                           setDetailTaskId(task.id);
                         }}
                         className="w-full truncate rounded-md border border-dashed border-[#DC2626]/35 bg-[#FEF2F2]/70 px-1.5 py-0.5 text-left text-[10px] font-semibold text-[#991B1B]"
@@ -1134,11 +948,9 @@ export default function CalendarView({
                 {period.days.map((day) => {
                   const dayData = dayScheduleMap.get(day.dateKey);
                   const allDayTasks = dayData?.allDayTasks ?? [];
-                  const allDayExt = dayData?.allDayExternalEvents ?? [];
                   const deadlineTasks = dayData?.deadlineOnlyTasks ?? [];
                   const isEmpty =
                     allDayTasks.length === 0 &&
-                    allDayExt.length === 0 &&
                     deadlineTasks.length === 0;
 
                   return (
@@ -1151,7 +963,6 @@ export default function CalendarView({
                           key={`ad-${task.id}`}
                           type="button"
                           onClick={() => {
-                            setDetailExternalEvent(null);
                             setDetailTaskId(task.id);
                           }}
                           className="w-full truncate rounded-lg bg-[#EBE8F8] px-2 py-1 text-left text-[11px] font-semibold text-[#171622] hover:bg-[#ded9f4]"
@@ -1160,26 +971,11 @@ export default function CalendarView({
                         </button>
                       ))}
 
-                      {allDayExt.map((ext: ExternalGoogleCalendarEvent) => (
-                        <button
-                          key={`ad-ext-${ext.id}`}
-                          type="button"
-                          onClick={() => {
-                            setDetailTaskId(null);
-                            setDetailExternalEvent(ext);
-                          }}
-                          className="w-full truncate rounded-lg border border-[#3B82F6]/30 bg-[#EFF6FF] px-2 py-1 text-left text-[11px] font-semibold text-[#1E3A8A]"
-                        >
-                          Google: {ext.title}
-                        </button>
-                      ))}
-
                       {deadlineTasks.map((task) => (
                         <button
                           key={`dl-${task.id}`}
                           type="button"
                           onClick={() => {
-                            setDetailExternalEvent(null);
                             setDetailTaskId(task.id);
                           }}
                           className="w-full flex items-center justify-between gap-1 truncate rounded-lg border border-dashed border-[#DC2626]/35 bg-[#FEF2F2]/75 px-2 py-1 text-left text-[11px] font-semibold text-[#991B1B] hover:bg-[#FEE2E2]"
@@ -1280,7 +1076,7 @@ export default function CalendarView({
                           </button>
                         ))}
 
-                        {/* Positioned Scheduled Tasks & Google Calendar Events */}
+                        {/* Positioned Scheduled Tasks */}
                         {timedItems.map((item) => renderHourlyItemBlock(item))}
                       </div>
                     );
@@ -1306,10 +1102,6 @@ export default function CalendarView({
           <span className="inline-flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-sm bg-[#F59E0B]" />
             <span>Overlapping Slot Warning</span>
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-sm bg-[#3B82F6]" />
-            <span>Google Calendar Event</span>
           </span>
         </div>
 
@@ -1342,29 +1134,21 @@ export default function CalendarView({
       {/* Scheduled Task Details & Accessible Reschedule Sheet */}
       <CalendarTaskDetailSheet
         task={detailTask}
-        externalEvent={detailExternalEvent}
         conflictingTitles={detailTaskConflictingTitles}
-        googleConnected={googleConnection.connected}
         onClose={() => {
           setDetailTaskId(null);
-          setDetailExternalEvent(null);
         }}
         onEditTask={(task) => {
           setDetailTaskId(null);
-          setDetailExternalEvent(null);
           setEditingTask(task);
           setPrefillSchedule(null);
           setIsFormModalOpen(true);
         }}
         onDeleteTask={(task) => {
           setDetailTaskId(null);
-          setDetailExternalEvent(null);
           setDeletingTask(task);
         }}
         onQuickUpdateTask={handleQuickUpdateTask}
-        onExportedToGoogle={async () => {
-          await fetchCalendarData(viewMode, anchorDate);
-        }}
       />
 
       {/* Delete Confirmation Modal */}
@@ -1373,29 +1157,6 @@ export default function CalendarView({
         onClose={() => setDeletingTask(null)}
         onConfirmDelete={handleConfirmDeleteTask}
         onArchiveInstead={handleArchiveTaskInstead}
-      />
-
-      {/* Google Calendar Integration & Setup Modal */}
-      <GoogleCalendarModal
-        isOpen={isGoogleModalOpen}
-        config={googleConfig}
-        connection={googleConnection}
-        onClose={() => setIsGoogleModalOpen(false)}
-        onConnected={async (msg) => {
-          setBannerNotice({
-            type: 'success',
-            message: msg,
-          });
-          await fetchCalendarData(viewMode, anchorDate);
-        }}
-        onDisconnected={async () => {
-          setBannerNotice({
-            type: 'success',
-            message:
-              'Disconnected Google Calendar. Your LifeCraft tasks remain untouched.',
-          });
-          await fetchCalendarData(viewMode, anchorDate);
-        }}
       />
     </div>
   );

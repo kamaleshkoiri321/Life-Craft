@@ -66,10 +66,10 @@ Engineered with the **Next.js 15 App Router** and **React 19**, Life-Craft provi
 - **Precision Stopwatch:** High-accuracy split and lap tracking with historical session logging.
 - **State Recovery:** Persists active countdowns across accidental browser refreshes.
 
-### 📅 Calendar & Google Calendar Sync
+### 📅 Native Calendar & Time-Blocking
 - **Unified Schedule:** View daily, weekly, and monthly time blocks with complete timezone awareness.
-- **Google Calendar Export:** One-click task synchronization with Google Calendar via OAuth 2.0.
-- **At-Rest Token Encryption:** Google OAuth tokens are stored using AES-256-GCM authenticated cipher with HMAC-SHA-256 signed states.
+- **Visual Hourly Grid:** 24-hour click time-slot scheduling and side-by-side overlap resolution.
+- **Deadline Management:** Clear visual distinction between deadline-only due dates and intentional scheduled work hours.
 
 ### ⚙️ User Settings & Personalization
 - **Clerk Core 3 Synchronization:** Synchronize display names, profile avatars, verified email addresses, passwords, and connected Google accounts natively with Clerk.
@@ -156,10 +156,6 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL` | **Yes** | Post-auth redirection destination (`/app`). |
 | `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL` | **Yes** | Post-registration redirection destination (`/app`). |
 | `DATABASE_URL` | **Yes** | Neon PostgreSQL connection string with SSL (`postgresql://...?sslmode=require`). |
-| `GOOGLE_CALENDAR_CLIENT_ID` | Optional | Google OAuth 2.0 Web Client ID for Google Calendar sync. |
-| `GOOGLE_CALENDAR_CLIENT_SECRET` | Optional | Google OAuth 2.0 Web Client Secret. |
-| `GOOGLE_CALENDAR_REDIRECT_URI` | Optional | Exact OAuth callback URI registered in Google Cloud Console. |
-| `GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY` | Optional | 32+ character key for AES-256-GCM encryption of stored OAuth tokens. |
 | `AWS_ACCESS_KEY_ID` | Optional | S3-compatible access key for Neon Object Storage. |
 | `AWS_SECRET_ACCESS_KEY` | Optional | S3-compatible secret key for Neon Object Storage. |
 | `AWS_ENDPOINT_URL_S3` | Optional | S3-compatible storage endpoint URL. |
@@ -230,7 +226,7 @@ Life-Craft adheres to a zero-trust, defense-in-depth security model:
 3. **CSRF & Same-Origin Verification:** All state-changing mutation endpoints verify request origin headers and reject cross-site submissions (`verifySameOriginMutation`).
 4. **Rate Limiting:** Sliding-window rate limiters prevent automated credential stuffing and resource exhaustion.
 5. **No Secrets in Bundles:** Zero private keys or database connection strings are prefixed with `NEXT_PUBLIC_` or included in frontend bundles.
-6. **Encrypted Third-Party Tokens:** Google Calendar OAuth tokens are encrypted at rest with AES-256-GCM.
+6. **Encrypted Private Data:** Document uploads and user records are securely isolated to the authenticated Clerk user.
 7. **Document Upload Sandboxing:** Uploaded library documents are inspected for binary magic bytes, served with strict CSP sandbox headers, and prevented from executing scripts.
 8. **Svix Webhook Verification:** Clerk webhook events are verified cryptographically using Svix signatures before modifying user records.
 
@@ -253,7 +249,6 @@ Life-Craft adheres to a zero-trust, defense-in-depth security model:
 | `POST` | `/api/notes` | Create a note or journal entry | Yes | Yes (120 req/min) |
 | `POST` | `/api/library/upload/init` | Initiate secure document upload | Yes | Yes (60 req/min) |
 | `PUT` | `/api/library/upload/[id]` | Upload binary PDF/EPUB bytes | Yes | Yes (60 req/min) |
-| `POST` | `/api/calendar/google/export` | Export task to Google Calendar | Yes | Yes (60 req/min) |
 | `POST` | `/api/webhooks/clerk` | Svix-verified user lifecycle sync | No (Svix HMAC) | Svix Signature |
 
 ---
@@ -269,7 +264,6 @@ npm run test
 ```
 ✔ Phase 2 authentication validation & security helpers (5 tests)
 ✔ Calendar scheduling, hourly grid & timezone handling (3 tests)
-✔ Google Calendar token crypto & OAuth state verification (3 tests)
 ✔ Focus Studio Pomodoro countdown, stopwatch & laps (4 tests)
 ✔ Goals, milestones & completion percentage tracking (5 tests)
 ✔ Habits streak calculations, weekday schedules & heatmaps (4 tests)

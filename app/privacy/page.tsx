@@ -7,7 +7,7 @@ import Footer from '@/components/Footer';
 export const metadata = {
   title: 'Privacy Policy — LifeCraft',
   description:
-    'Learn how LifeCraft protects your privacy, secures your workspace data, and handles Google Calendar integration.',
+    'Learn how LifeCraft protects your privacy, secures your workspace data, and ensures complete user control.',
 };
 
 export default function PrivacyPage() {
@@ -58,10 +58,10 @@ export default function PrivacyPage() {
             <div className="rounded-2xl border border-[#171622]/8 bg-[#FAF9F6] p-4 space-y-1.5">
               <div className="flex items-center gap-2 text-xs font-bold text-[#171622]">
                 <Calendar className="h-4 w-4 text-[#2F6B1E]" />
-                <span>Google Limited Use</span>
+                <span>Native Private Schedule</span>
               </div>
               <p className="text-xs text-[#171622]/70 leading-relaxed">
-                Google Calendar data is accessed solely to display your schedule and export chosen tasks. Tokens are encrypted at rest with AES-256-GCM.
+                Your calendar events and tasks remain 100% in your private database with zero external calendar tracking.
               </p>
             </div>
             <div className="rounded-2xl border border-[#171622]/8 bg-[#FAF9F6] p-4 space-y-1.5">
@@ -115,49 +115,10 @@ export default function PrivacyPage() {
                 <li><strong>Personal Library:</strong> Reading status, bookmarks, and private reading documents (PDF/EPUB) uploaded to your encrypted storage.</li>
               </ul>
 
-              <h3 className="font-semibold text-[#171622] pt-2">C. Google Calendar Integration Data (OAuth 2.0)</h3>
+              <h3 className="font-semibold text-[#171622] pt-2">C. Native Calendar & Schedule Data</h3>
               <p>
-                If you voluntarily choose to connect your Google Calendar account, LifeCraft requests the specific OAuth scope:
+                LifeCraft provides a native custom calendar for scheduling time-blocks and managing task deadlines. All scheduled blocks, start and end times, and duration records are stored directly in your private PostgreSQL database. No third-party calendar accounts or external APIs are connected or required.
               </p>
-              <div className="rounded-xl border border-[#171622]/10 bg-[#FAF9F6] p-3 font-mono text-xs text-[#171622]">
-                https://www.googleapis.com/auth/calendar.events
-              </div>
-              <p>
-                This permission allows LifeCraft to:
-              </p>
-              <ul className="list-disc pl-5 space-y-1.5 text-xs sm:text-sm">
-                <li>Read calendar events on your primary calendar to overlay them visually on your LifeCraft hourly timeline alongside your tasks.</li>
-                <li>Export scheduled LifeCraft tasks into Google Calendar events when you explicitly trigger the export action.</li>
-              </ul>
-              <p>
-                We store Google OAuth refresh tokens encrypted at rest using industry-standard <strong>AES-256-GCM</strong> encryption. We never read your contacts, emails, Google Drive files, or calendars other than the events you authorize.
-              </p>
-            </section>
-
-            {/* 3. Google API Services User Data Policy Compliance */}
-            <section className="space-y-3 rounded-2xl border border-[#171622]/15 bg-[#FAF9F6] p-5 sm:p-6">
-              <h2 className="font-display text-lg sm:text-xl font-bold text-[#171622] flex items-center gap-2">
-                <Shield className="h-5 w-5 text-[#5938B5]" />
-                <span>3. Google API Limited Use Disclosure</span>
-              </h2>
-              <p className="text-xs sm:text-sm leading-relaxed">
-                LifeCraft&rsquo;s use and transfer to any other app of information received from Google APIs will adhere to the{' '}
-                <a
-                  href="https://developers.google.com/terms/api-services-user-data-policy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-semibold text-[#5938B5] underline underline-offset-2 hover:text-[#171622]"
-                >
-                  Google API Services User Data Policy
-                </a>
-                , including the Limited Use requirements.
-              </p>
-              <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm">
-                <li>We do not use Google Calendar data to serve advertisements or target users.</li>
-                <li>We do not sell Google user data to any third party under any circumstances.</li>
-                <li>We do not use Google user data to train generalized artificial intelligence or machine learning models.</li>
-                <li>Humans do not read your Google Calendar events unless you have given explicit consent for troubleshooting or it is required by law.</li>
-              </ul>
             </section>
 
             {/* 4. How We Use Information */}
@@ -201,7 +162,7 @@ export default function PrivacyPage() {
               <ul className="list-disc pl-5 space-y-1.5 text-xs sm:text-sm">
                 <li><strong>Clerk Inc.:</strong> User identity management, session token verification, and multi-factor authentication.</li>
                 <li><strong>Neon Inc.:</strong> Managed serverless PostgreSQL database hosting and encrypted storage.</li>
-                <li><strong>Google LLC:</strong> Google OAuth 2.0 authentication and Google Calendar API synchronization (optional).</li>
+                <li><strong>Google LLC:</strong> Optional federated Sign-In with Google authentication via Clerk.</li>
                 <li><strong>Vercel Inc.:</strong> Edge hosting, serverless compute, and static content delivery.</li>
               </ul>
             </section>
@@ -216,7 +177,6 @@ export default function PrivacyPage() {
               </p>
               <ul className="list-disc pl-5 space-y-1.5 text-xs sm:text-sm">
                 <li><strong>Individual Item Deletion:</strong> You can delete any individual task, habit log, note, or library file directly in the app at any time.</li>
-                <li><strong>Disconnecting Google Calendar:</strong> Disconnecting Google Calendar from the Calendar modal immediately revokes access and permanently deletes your stored Google OAuth tokens from our database.</li>
                 <li><strong>Permanent Account Deletion:</strong> You can permanently delete your entire LifeCraft account under <strong>Settings &rarr; Account</strong>. This initiates an immediate cascading deletion of all your tasks, habits, goals, notes, library files, focus sessions, and preferences across our database and storage buckets.</li>
               </ul>
             </section>
