@@ -5,6 +5,7 @@ import {
   date,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -764,9 +765,102 @@ export const focusSessions = pgTable(
   ]
 );
 
+export interface CalendarEventReminder {
+  minutesBefore: number;
+  channel?: 'in_app' | 'email';
+  enabled?: boolean;
+}
+
+export interface CalendarEventRecurrenceRule {
+  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom';
+  interval: number; // e.g. every 1 week, every 2 days
+  daysOfWeek?: number[]; // 0 = Sun, 1 = Mon, ...
+  endType: 'never' | 'until' | 'count';
+  endDate?: string; // YYYY-MM-DD
+  count?: number; // e.g. 10 occurrences
+}
+
+export const calendarEvents = pgTable(
+  'calendar_events',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => userProfiles.userId, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    description: text('description'),
+    notes: text('notes'),
+    category: text('category').notNull().default('General'),
+    color: text('color').notNull().default('#5938B5'),
+    startAt: timestamp('start_at', { withTimezone: true }).notNull(),
+    endAt: timestamp('end_at', { withTimezone: true }).notNull(),
+    isAllDay: boolean('is_all_day').notNull().default(false),
+    timezone: text('timezone').notNull().default('Asia/Kathmandu'),
+    meetingUrl: text('meeting_url'),
+    recurrenceRule: jsonb('recurrence_rule').$type<CalendarEventRecurrenceRule | null>(),
+    recurringEventId: uuid('recurring_event_id'),
+    reminders: jsonb('reminders').$type<CalendarEventReminder[]>().notNull().default([]),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('calendar_events_id_user_id_unique').on(table.id, table.userId),
+    index('calendar_events_user_id_idx').on(table.userId),
+    index('calendar_events_user_start_end_idx').on(
+      table.userId,
+      table.startAt,
+      table.endAt
+    ),
+    index('calendar_events_user_category_idx').on(table.userId, table.category),
+    check(
+      'calendar_events_end_after_start_check',
+      sql`${table.endAt} >= ${table.startAt}`
+    ),
+  ]
+);
+
+export const calendarEventAttachments = pgTable(
+  'calendar_event_attachments',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    eventId: uuid('event_id')
+      .notNull()
+      .references(() => calendarEvents.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => userProfiles.userId, { onDelete: 'cascade' }),
+    fileName: text('file_name').notNull(),
+    fileType: text('file_type').notNull(),
+    fileSize: integer('file_size').notNull(),
+    storageBucket: text('storage_bucket').notNull(),
+    storageKey: text('storage_key').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('calendar_event_attachments_id_user_id_unique').on(
+      table.id,
+      table.userId
+    ),
+    index('calendar_event_attachments_event_id_idx').on(table.eventId),
+    index('calendar_event_attachments_user_id_idx').on(table.userId),
+  ]
+);
+
 export type UserProfileRow = typeof userProfiles.$inferSelect;
 export type UserPreferenceRow = typeof userPreferences.$inferSelect;
 export type TaskRow = typeof tasks.$inferSelect;
+export type CalendarEventRow = typeof calendarEvents.$inferSelect;
+export type CalendarEventAttachmentRow =
+  typeof calendarEventAttachments.$inferSelect;
 export type GoogleCalendarConnectionRow =
   typeof googleCalendarConnections.$inferSelect;
 export type GoogleCalendarEventMappingRow =

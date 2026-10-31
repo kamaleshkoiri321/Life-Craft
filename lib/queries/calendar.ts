@@ -19,6 +19,10 @@ import {
   isValidCalendarView,
   type CalendarViewMode,
 } from '../calendar/calendar-utils';
+import {
+  listCalendarEventsForUser,
+} from './events';
+import type { SerializedCalendarEvent } from '../calendar/event-validation';
 
 export interface CalendarDataPayload {
   timezone: string;
@@ -31,6 +35,7 @@ export interface CalendarDataPayload {
   headingLabel: string;
   rangeTasks: SerializedTaskItem[];
   unscheduledTasks: SerializedTaskItem[];
+  events: SerializedCalendarEvent[];
 }
 
 export type CalendarQueryResult =
@@ -139,6 +144,13 @@ export async function getCalendarViewDataForUser(
       })
     );
 
+    const eventsResult = await listCalendarEventsForUser(authUser, {
+      startUtc: period.startUtc,
+      endUtc: period.endUtc,
+      timezone,
+    });
+    const events = eventsResult.status === 'ok' ? eventsResult.events : [];
+
     return {
       status: 'ok',
       data: {
@@ -152,6 +164,7 @@ export async function getCalendarViewDataForUser(
         headingLabel: period.headingLabel,
         rangeTasks,
         unscheduledTasks,
+        events,
       },
     };
   } catch (err) {

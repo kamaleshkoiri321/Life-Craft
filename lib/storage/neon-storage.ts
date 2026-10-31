@@ -356,6 +356,71 @@ export async function putPrivateStorageObject(params: {
 }
 
 /**
+ * Writes binary bytes (PDF, document, image, audio, etc.) to storage.
+ */
+export async function putGeneralStorageObject(params: {
+  bucket: string;
+  storageKey: string;
+  bytes: Uint8Array;
+  mimeType: string;
+  maxBytes?: number;
+}): Promise<{ ok: true; sizeBytes: number } | { ok: false; error: string }> {
+  const maxLimit = params.maxBytes ?? 50 * 1024 * 1024;
+  if (params.bytes.byteLength <= 0) {
+    return { ok: false, error: 'Uploaded file is empty.' };
+  }
+  if (params.bytes.byteLength > maxLimit) {
+    return {
+      ok: false,
+      error: `Uploaded file exceeds the ${Math.round(maxLimit / (1024 * 1024))} MB maximum limit.`,
+    };
+  }
+
+  const s3 = getS3Client();
+  if (s3) {
+    try {
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: params.bucket,
+          Key: params.storageKey,
+          Body: params.bytes,
+          ContentType: params.mimeType,
+          ContentLength: params.bytes.byteLength,
+        })
+      );
+      return { ok: true, sizeBytes: params.bytes.byteLength };
+    } catch (err) {
+      console.error(
+        '[LifeCraft Storage] S3 PutObject failed for bucket:',
+        params.bucket,
+        err instanceof Error ? err.message : 'Unknown error'
+      );
+      return {
+        ok: false,
+        error:
+          'Could not store file in Neon Object Storage. Verify bucket name and S3 write permissions.',
+      };
+    }
+  }
+
+  // Private server vault storage fallback
+  try {
+    const targetPath = resolvePrivateVaultFilePath(
+      params.bucket,
+      params.storageKey
+    );
+    await fs.mkdir(path.dirname(targetPath), { recursive: true });
+    await fs.writeFile(targetPath, params.bytes);
+    return { ok: true, sizeBytes: params.bytes.byteLength };
+  } catch {
+    return {
+      ok: false,
+      error: 'Failed to store uploaded file in private server storage.',
+    };
+  }
+}
+
+/**
  * Verifies that an uploaded object exists in storage, is within the 50 MB limit,
  * and matches the expected PDF or EPUB binary signature before finalizing PostgreSQL metadata.
  */

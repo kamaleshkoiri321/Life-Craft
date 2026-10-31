@@ -11,8 +11,9 @@ import {
   isValidLocalDateString,
   type SerializedTaskItem,
 } from '../tasks/validation';
+import type { SerializedCalendarEvent } from './event-validation';
 
-export const CALENDAR_VIEWS = ['month', 'week', 'day'] as const;
+export const CALENDAR_VIEWS = ['month', 'week', 'day', 'agenda'] as const;
 export type CalendarViewMode = (typeof CALENDAR_VIEWS)[number];
 
 export const INITIAL_VISIBLE_START_HOUR = 6; // 6:00 AM
@@ -69,7 +70,7 @@ export interface CalendarPeriodRange {
 
 export interface CalendarTimedLayoutItem {
   id: string;
-  source: 'lifecraft_task';
+  source: 'lifecraft_task' | 'calendar_event';
   title: string;
   timeRangeLabel: string;
   startUtcMs: number;
@@ -87,11 +88,13 @@ export interface CalendarTimedLayoutItem {
   spansMidnightBefore: boolean;
   spansMidnightAfter: boolean;
   task?: SerializedTaskItem;
+  event?: SerializedCalendarEvent;
 }
 
 export interface CalendarDayScheduleData {
   dateKey: string;
   allDayTasks: SerializedTaskItem[];
+  allDayEvents: SerializedCalendarEvent[];
   deadlineOnlyTasks: SerializedTaskItem[];
   timedItems: CalendarTimedLayoutItem[];
   conflictCount: number;
@@ -190,6 +193,10 @@ export function shiftCalendarAnchorDate(
     return shiftLocalDateString(anchorDate, direction * 7);
   }
 
+  if (view === 'agenda') {
+    return shiftLocalDateString(anchorDate, direction * 14);
+  }
+
   // Month shift: preserve day-of-month where possible, clamping to last day of target month
   const [y, m, d] = anchorDate.split('-').map(Number);
   const targetFirst = new Date(Date.UTC(y, m - 1 + direction, 1, 12, 0, 0));
@@ -280,6 +287,32 @@ export function getCalendarPeriodRange(params: {
     };
   }
 
+  if (params.view === 'agenda') {
+    const days: CalendarDayDescriptor[] = [];
+    for (let i = 0; i < 30; i += 1) {
+      const dateKey = shiftLocalDateString(anchorDate, i);
+      days.push(
+        buildCalendarDayDescriptor(dateKey, {
+          timezone: tz,
+          todayLocalDate,
+          referenceMonthPrefix,
+        })
+      );
+    }
+    const firstDay = days[0];
+    const lastDay = days[days.length - 1];
+    return {
+      view: 'agenda',
+      anchorDate,
+      startDateKey: firstDay.dateKey,
+      endDateKey: lastDay.dateKey,
+      startUtc: firstDay.startUtc,
+      endUtc: lastDay.endUtc,
+      headingLabel: `Agenda: ${firstDay.monthShort} ${firstDay.dayOfMonth} – ${lastDay.monthShort} ${lastDay.dayOfMonth}`,
+      days,
+    };
+  }
+
   // Month view: 42 days (6 full weeks) starting from the week of the 1st of the month
   const firstOfMonthKey = `${referenceMonthPrefix}-01`;
   const gridStartKey = getStartOfWeekDateKey(firstOfMonthKey, weekStartsOn);
@@ -361,6 +394,7 @@ function getLocalMinutesSinceMidnight(
 export function buildDayScheduleData(params: {
   day: CalendarDayDescriptor;
   tasks: SerializedTaskItem[];
+  events?: SerializedCalendarEvent[];
   timezone?: string;
 }): CalendarDayScheduleData {
   const tz = resolveValidTimezone(params.timezone ?? DEFAULT_TIMEZONE);
@@ -369,6 +403,7 @@ export function buildDayScheduleData(params: {
   const dayEndMs = endUtc.getTime();
 
   const activeTasks = params.tasks.filter((t) => t.status !== 'archived');
+  const activeEvents = params.events ?? [];
 
   // 1. All-day LifeCraft tasks overlapping this local day
   const allDayTasks = activeTasks.filter((t) => {
@@ -378,16 +413,24 @@ export function buildDayScheduleData(params: {
     return sMs < dayEndMs && eMs > dayStartMs;
   });
 
-  // 2. Tasks with a deadline on this local day that do NOT have a scheduled time slot
+  // 2. All-day Calendar Events overlapping this local day
+  const allDayEvents = activeEvents.filter((e) => {
+    if (!e.isAllDay) return false;
+    const sMs = new Date(e.startIso).getTime();
+    const eMs = new Date(e.endIso).getTime();
+    return sMs < dayEndMs && eMs > dayStartMs;
+  });
+
+  // 3. Tasks with a deadline on this local day that do NOT have a scheduled time slot
   const deadlineOnlyTasks = activeTasks.filter((t) => {
     if (t.scheduledStartAt && t.scheduledEndAt) return false;
     return t.dueDate === dateKey;
   });
 
-  // 3. Timed items (LifeCraft scheduled timed tasks)
+  // 4. Timed items (LifeCraft scheduled tasks and calendar events)
   interface RawTimedCandidate {
     id: string;
-    source: 'lifecraft_task';
+    source: 'lifecraft_task' | 'calendar_event';
     title: string;
     timeRangeLabel: string;
     startUtcMs: number;
@@ -398,6 +441,7 @@ export function buildDayScheduleData(params: {
     spansMidnightBefore: boolean;
     spansMidnightAfter: boolean;
     task?: SerializedTaskItem;
+    event?: SerializedCalendarEvent;
   }
 
   const rawTimed: RawTimedCandidate[] = [];
@@ -446,6 +490,53 @@ export function buildDayScheduleData(params: {
       spansMidnightBefore,
       spansMidnightAfter,
       task: t,
+    });
+  }
+
+  for (const e of activeEvents) {
+    if (e.isAllDay) continue;
+    const sMs = new Date(e.startIso).getTime();
+    const eMs = new Date(e.endIso).getTime();
+    if (Number.isNaN(sMs) || Number.isNaN(eMs) || eMs <= sMs) continue;
+    if (sMs >= dayEndMs || eMs <= dayStartMs) continue;
+
+    const spansMidnightBefore = sMs < dayStartMs;
+    const spansMidnightAfter = eMs > dayEndMs;
+
+    const startMinutes = getLocalMinutesSinceMidnight(
+      Math.max(sMs, dayStartMs),
+      dateKey,
+      dayStartMs,
+      dayEndMs,
+      tz
+    );
+    const rawEndMinutes = getLocalMinutesSinceMidnight(
+      Math.min(eMs, dayEndMs),
+      dateKey,
+      dayStartMs,
+      dayEndMs,
+      tz
+    );
+    const endMinutes = Math.max(startMinutes + 5, rawEndMinutes);
+    const visualDurationMinutes = Math.max(25, endMinutes - startMinutes);
+
+    const sLabel = formatLocalTime(new Date(sMs), tz) ?? '';
+    const eLabel = formatLocalTime(new Date(eMs), tz) ?? '';
+
+    rawTimed.push({
+      id: `event:${e.id}`,
+      source: 'calendar_event',
+      title: e.title,
+      timeRangeLabel:
+        sLabel && eLabel ? `${sLabel} – ${eLabel}` : `${e.startTime} – ${e.endTime}`,
+      startUtcMs: sMs,
+      endUtcMs: eMs,
+      startMinutes,
+      endMinutes,
+      visualDurationMinutes,
+      spansMidnightBefore,
+      spansMidnightAfter,
+      event: e,
     });
   }
 
@@ -562,6 +653,7 @@ export function buildDayScheduleData(params: {
   return {
     dateKey,
     allDayTasks,
+    allDayEvents,
     deadlineOnlyTasks,
     timedItems,
     conflictCount,
